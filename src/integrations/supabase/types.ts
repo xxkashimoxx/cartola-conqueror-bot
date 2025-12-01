@@ -14,7 +14,179 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      atleta_pontuacoes: {
+        Row: {
+          atleta_id: number | null
+          created_at: string | null
+          id: number
+          pontos: number
+          preco: number | null
+          rodada: number
+        }
+        Insert: {
+          atleta_id?: number | null
+          created_at?: string | null
+          id?: number
+          pontos: number
+          preco?: number | null
+          rodada: number
+        }
+        Update: {
+          atleta_id?: number | null
+          created_at?: string | null
+          id?: number
+          pontos?: number
+          preco?: number | null
+          rodada?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atleta_pontuacoes_atleta_id_fkey"
+            columns: ["atleta_id"]
+            isOneToOne: false
+            referencedRelation: "atletas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      atletas: {
+        Row: {
+          apelido: string
+          clube_id: number | null
+          created_at: string | null
+          foto_url: string | null
+          id: number
+          jogos: number | null
+          media: number | null
+          nome: string
+          pontos_num: number | null
+          posicao_id: number | null
+          preco: number | null
+          status_id: number | null
+          updated_at: string | null
+          variacao_preco: number | null
+        }
+        Insert: {
+          apelido: string
+          clube_id?: number | null
+          created_at?: string | null
+          foto_url?: string | null
+          id: number
+          jogos?: number | null
+          media?: number | null
+          nome: string
+          pontos_num?: number | null
+          posicao_id?: number | null
+          preco?: number | null
+          status_id?: number | null
+          updated_at?: string | null
+          variacao_preco?: number | null
+        }
+        Update: {
+          apelido?: string
+          clube_id?: number | null
+          created_at?: string | null
+          foto_url?: string | null
+          id?: number
+          jogos?: number | null
+          media?: number | null
+          nome?: string
+          pontos_num?: number | null
+          posicao_id?: number | null
+          preco?: number | null
+          status_id?: number | null
+          updated_at?: string | null
+          variacao_preco?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "atletas_clube_id_fkey"
+            columns: ["clube_id"]
+            isOneToOne: false
+            referencedRelation: "clubes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "atletas_posicao_id_fkey"
+            columns: ["posicao_id"]
+            isOneToOne: false
+            referencedRelation: "posicoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      clubes: {
+        Row: {
+          abreviacao: string
+          created_at: string | null
+          escudo_url: string | null
+          id: number
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          abreviacao: string
+          created_at?: string | null
+          escudo_url?: string | null
+          id: number
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          abreviacao?: string
+          created_at?: string | null
+          escudo_url?: string | null
+          id?: number
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      mercado_status: {
+        Row: {
+          abertura: string | null
+          created_at: string | null
+          fechamento: string | null
+          id: number
+          rodada_atual: number
+          status_mercado: number
+        }
+        Insert: {
+          abertura?: string | null
+          created_at?: string | null
+          fechamento?: string | null
+          id?: number
+          rodada_atual: number
+          status_mercado: number
+        }
+        Update: {
+          abertura?: string | null
+          created_at?: string | null
+          fechamento?: string | null
+          id?: number
+          rodada_atual?: number
+          status_mercado?: number
+        }
+        Relationships: []
+      }
+      posicoes: {
+        Row: {
+          abreviacao: string
+          id: number
+          nome: string
+        }
+        Insert: {
+          abreviacao: string
+          id: number
+          nome: string
+        }
+        Update: {
+          abreviacao?: string
+          id?: number
+          nome?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
