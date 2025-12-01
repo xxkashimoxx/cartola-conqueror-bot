@@ -1,102 +1,179 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { LogOut, TrendingUp, TrendingDown, Target, Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw } from "lucide-react";
 
 interface Player {
   id: number;
+  rank: number;
   name: string;
+  fullName: string;
   position: string;
   team: string;
+  teamName: string;
+  shield?: string;
+  photo?: string;
+  price: number;
   predictedScore: number;
   probability: number;
-  trend: "up" | "down" | "stable";
-  price: number;
+  trend: 'up' | 'down' | 'stable';
+  average: number;
+  games: number;
+  totalPoints: number;
 }
 
-const mockPlayers: Player[] = [
-  { id: 1, name: "Pedro", position: "ATA", team: "FLA", predictedScore: 12.5, probability: 87, trend: "up", price: 28.5 },
-  { id: 2, name: "Arrascaeta", position: "MEI", team: "FLA", predictedScore: 11.2, probability: 82, trend: "up", price: 22.3 },
-  { id: 3, name: "Gabi Gol", position: "ATA", team: "FLA", predictedScore: 10.8, probability: 79, trend: "stable", price: 24.1 },
-  { id: 4, name: "Hulk", position: "ATA", team: "CAM", predictedScore: 10.5, probability: 75, trend: "up", price: 26.7 },
-  { id: 5, name: "Paulinho", position: "ATA", team: "CAM", predictedScore: 9.7, probability: 71, trend: "down", price: 18.9 },
-  { id: 6, name: "Piton", position: "LAT", team: "FLU", predictedScore: 9.3, probability: 68, trend: "up", price: 12.4 },
-  { id: 7, name: "Everton Ribeiro", position: "MEI", team: "BAH", predictedScore: 8.9, probability: 65, trend: "stable", price: 15.8 },
-  { id: 8, name: "Calleri", position: "ATA", team: "SAO", predictedScore: 8.5, probability: 62, trend: "down", price: 19.2 },
-];
-
 const Dashboard = () => {
+  const [user, setUser] = useState<any>(null);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
       if (!session) {
         navigate("/auth");
-      } else {
-        setUser(session.user);
       }
-    };
-    checkUser();
-
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "SIGNED_OUT") {
-        navigate("/auth");
-      }
-      setUser(session?.user ?? null);
     });
 
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const fetchPlayers = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase.functions.invoke('get-top-players', {
+        body: { limit: 20 }
+      });
+
+      if (error) throw error;
+
+      if (data?.success && data?.data) {
+        setPlayers(data.data);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar jogadores:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível carregar os dados dos jogadores",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const syncCartolaData = async () => {
+    try {
+      setSyncing(true);
+      toast({
+        title: "Sincronizando...",
+        description: "Buscando dados atualizados do Cartola FC",
+      });
+
+      const { data, error } = await supabase.functions.invoke('sync-cartola-data');
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: "Sincronização concluída!",
+          description: `${data.atletas} atletas e ${data.clubes} clubes atualizados`,
+        });
+        await fetchPlayers();
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar:', error);
+      toast({
+        title: "Erro na sincronização",
+        description: "Não foi possível sincronizar com o Cartola FC",
+        variant: "destructive",
+      });
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchPlayers();
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     toast({
-      title: "Logout realizado",
-      description: "Até a próxima batalha!",
+      title: "Até a próxima!",
+      description: "Você saiu da conta com sucesso",
     });
+    navigate("/auth");
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="h-12 w-12 text-neon-cyan animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground text-lg">Carregando dados...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-black text-neon-cyan uppercase tracking-wider">
+      <div className="bg-card border-b-2 border-border shadow-lg">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <h1 className="text-neon-cyan font-black text-3xl md:text-4xl tracking-wider">
               XXKASHIMOXX
             </h1>
-            <div className="flex items-center gap-4">
+            <div className="flex gap-2 flex-wrap justify-center">
               <Button
+                onClick={syncCartolaData}
+                disabled={syncing}
                 variant="outline"
-                onClick={() => navigate("/compare")}
-                className="border-primary text-foreground"
+                className="border-2 border-neon-cyan hover:bg-card"
               >
-                <Target className="mr-2 h-4 w-4" />
+                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Sincronizando...' : 'Atualizar Dados'}
+              </Button>
+              <Button
+                onClick={() => navigate("/compare")}
+                variant="outline"
+                className="border-2 border-border hover:bg-card"
+              >
+                <Users className="mr-2 h-4 w-4" />
                 Comparar
               </Button>
               <Button
-                variant="outline"
                 onClick={() => navigate("/team-builder")}
-                className="border-primary text-foreground"
+                className="bg-primary hover:bg-primary/80 shadow-neon"
               >
-                <Users className="mr-2 h-4 w-4" />
+                <Trophy className="mr-2 h-4 w-4" />
                 Meu Time
               </Button>
               <Button
-                variant="outline"
                 onClick={handleLogout}
-                className="border-destructive text-destructive"
+                variant="destructive"
+                className="border-2 border-destructive shadow-danger"
               >
-                <LogOut className="mr-2 h-4 w-4" />
                 Sair
               </Button>
             </div>
@@ -107,64 +184,129 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-black text-foreground mb-2 uppercase">
-            PREVISÕES DA RODADA
+          <h2 className="text-neon-red font-black text-2xl md:text-3xl mb-2">
+            TOP ATLETAS DO CARTOLA
           </h2>
-          <p className="text-muted-foreground">
-            Top jogadores com maior probabilidade de pontuação alta
+          <p className="text-muted-foreground text-lg">
+            Dados reais da API oficial do Cartola FC
           </p>
         </div>
 
-        <div className="grid gap-4">
-          {mockPlayers.map((player, index) => (
-            <Card key={player.id} className="bg-card border-border hover:border-primary transition-all duration-300 p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="text-4xl font-black text-neon-cyan w-12">
-                    #{index + 1}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-foreground">{player.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {player.position} • {player.team} • C$ {player.price.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-8">
-                  <div className="text-center">
-                    <div className="text-3xl font-black text-neon-green">
-                      {player.predictedScore.toFixed(1)}
-                    </div>
-                    <div className="text-xs text-muted-foreground uppercase">Pontos</div>
-                  </div>
-
-                  <div className="text-center min-w-[120px]">
-                    <div className="text-2xl font-bold text-foreground">
-                      {player.probability}%
-                    </div>
-                    <Progress value={player.probability} className="h-2 mt-2" />
-                    <div className="text-xs text-muted-foreground uppercase mt-1">Confiança</div>
-                  </div>
-
-                  <div className="text-center">
-                    {player.trend === "up" && (
-                      <TrendingUp className="h-8 w-8 text-neon-green" />
-                    )}
-                    {player.trend === "down" && (
-                      <TrendingDown className="h-8 w-8 text-neon-red" />
-                    )}
-                    {player.trend === "stable" && (
-                      <div className="h-8 w-8 flex items-center justify-center">
-                        <div className="h-1 w-6 bg-muted-foreground" />
+        {players.length === 0 ? (
+          <Card className="p-8 text-center">
+            <p className="text-muted-foreground mb-4">
+              Nenhum dado disponível. Clique em "Atualizar Dados" para sincronizar com o Cartola FC.
+            </p>
+            <Button onClick={syncCartolaData} disabled={syncing}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+              Sincronizar Agora
+            </Button>
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {players.map((player) => (
+              <Card key={player.id} className="bg-card border-2 border-border hover:border-primary transition-all duration-300 shadow-lg hover:shadow-neon overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl font-black text-neon-cyan">
+                        #{player.rank}
+                      </span>
+                      {player.shield && (
+                        <img 
+                          src={player.shield} 
+                          alt={player.teamName}
+                          className="w-8 h-8 object-contain"
+                        />
+                      )}
+                      <div>
+                        <h3 className="font-bold text-foreground text-lg">
+                          {player.name}
+                        </h3>
+                        <p className="text-muted-foreground text-sm">
+                          {player.position} • {player.team}
+                        </p>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground text-sm font-medium">
+                        Previsão
+                      </span>
+                      <span className="text-neon-green font-bold text-xl">
+                        {player.predictedScore.toFixed(1)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground text-sm">
+                          Probabilidade
+                        </span>
+                        <span className="text-foreground font-bold">
+                          {player.probability}%
+                        </span>
+                      </div>
+                      <Progress value={player.probability} className="h-2" />
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-border">
+                      <span className="text-muted-foreground text-sm">
+                        Média
+                      </span>
+                      <span className="text-foreground font-bold">
+                        {player.average?.toFixed(2) || '0.00'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground text-sm">
+                        Preço
+                      </span>
+                      <span className="text-neon-yellow font-bold">
+                        C$ {player.price?.toFixed(1) || '0.0'}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground text-sm">
+                        Tendência
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {player.trend === 'up' && (
+                          <>
+                            <TrendingUp className="h-4 w-4 text-neon-green" />
+                            <span className="text-neon-green text-sm font-bold">
+                              Alta
+                            </span>
+                          </>
+                        )}
+                        {player.trend === 'down' && (
+                          <>
+                            <TrendingDown className="h-4 w-4 text-neon-red" />
+                            <span className="text-neon-red text-sm font-bold">
+                              Baixa
+                            </span>
+                          </>
+                        )}
+                        {player.trend === 'stable' && (
+                          <>
+                            <Minus className="h-4 w-4 text-neon-yellow" />
+                            <span className="text-neon-yellow text-sm font-bold">
+                              Estável
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
