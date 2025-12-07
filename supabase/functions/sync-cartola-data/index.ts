@@ -38,6 +38,13 @@ interface CartolaMercado {
   };
 }
 
+interface CartolaAtletaPontuado {
+  atleta_id: number;
+  apelido: string;
+  pontuacao: number;
+  preco_num?: number;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -147,6 +154,73 @@ Deno.serve(async (req) => {
       console.log(`Total de ${atletasFormatados.length} atletas processados`);
     }
 
+    // 5. Sincronizar pontuações por rodada
+    console.log('Sincronizando pontuações por rodada...');
+    let pontuacoesTotal = 0;
+    const rodadaAtual = mercadoData.rodada_atual;
+    const pontuacaoBatchSize = 500;
+
+    // Verificar quais rodadas já foram sincronizadas
+    const { data: rodadasSincronizadas } = await supabase
+      .from('atleta_pontuacoes')
+      .select('rodada')
+      .order('rodada', { ascending: false });
+
+    const rodadasExistentes = new Set(rodadasSincronizadas?.map(r => r.rodada) || []);
+    console.log(`Rodadas já sincronizadas: ${Array.from(rodadasExistentes).join(', ') || 'nenhuma'}`);
+
+    // Sincronizar rodadas passadas (de 1 até rodada atual - 1)
+    for (let rodada = 1; rodada < rodadaAtual; rodada++) {
+      if (rodadasExistentes.has(rodada)) {
+        console.log(`Rodada ${rodada} já sincronizada, pulando...`);
+        continue;
+      }
+
+      try {
+        console.log(`Buscando pontuações da rodada ${rodada}...`);
+        const pontuadosResponse = await fetch(`https://api.cartolafc.globo.com/atletas/pontuados/${rodada}`);
+        
+        if (!pontuadosResponse.ok) {
+          console.log(`Rodada ${rodada} não disponível (status ${pontuadosResponse.status})`);
+          continue;
+        }
+
+        const pontuadosData = await pontuadosResponse.json();
+        const atletasPontuados: CartolaAtletaPontuado[] = Object.values(pontuadosData.atletas || {});
+
+        if (atletasPontuados.length > 0) {
+          const pontuacoesFormatadas = atletasPontuados.map(atleta => ({
+            atleta_id: atleta.atleta_id,
+            rodada: rodada,
+            pontos: atleta.pontuacao,
+            preco: atleta.preco_num || null,
+          }));
+
+          // Inserir em lotes de 500
+          for (let i = 0; i < pontuacoesFormatadas.length; i += pontuacaoBatchSize) {
+            const batch = pontuacoesFormatadas.slice(i, i + pontuacaoBatchSize);
+            const { error: pontuacoesError } = await supabase
+              .from('atleta_pontuacoes')
+              .insert(batch);
+
+            if (pontuacoesError) {
+              console.error(`Erro ao salvar pontuações rodada ${rodada}:`, pontuacoesError);
+            }
+          }
+
+          pontuacoesTotal += atletasPontuados.length;
+          console.log(`Rodada ${rodada}: ${atletasPontuados.length} pontuações salvas`);
+        }
+
+        // Rate limiting - aguardar 500ms entre requisições
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error(`Erro ao processar rodada ${rodada}:`, error);
+      }
+    }
+
+    console.log(`Total de ${pontuacoesTotal} pontuações sincronizadas`);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -154,6 +228,7 @@ Deno.serve(async (req) => {
         rodada: mercadoData.rodada_atual,
         clubes: clubes.length,
         atletas: atletas.length,
+        pontuacoes: pontuacoesTotal,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
