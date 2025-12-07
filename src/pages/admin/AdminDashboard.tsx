@@ -60,6 +60,19 @@ interface Posicao {
   abreviacao: string;
 }
 
+interface PontuacaoRodada {
+  rodada: number;
+  pontos: number;
+  atleta_id: number | null;
+}
+
+interface RodadaChartData {
+  rodada: string;
+  mediaPontos: number;
+  totalPontos: number;
+  jogadores: number;
+}
+
 const CHART_COLORS = [
   "hsl(var(--primary))",
   "hsl(var(--chart-2))",
@@ -72,6 +85,7 @@ const AdminDashboard = () => {
   const [syncHistory, setSyncHistory] = useState<SyncAnalytics[]>([]);
   const [topPlayers, setTopPlayers] = useState<Atleta[]>([]);
   const [posicoes, setPosicoes] = useState<Posicao[]>([]);
+  const [pontuacoesRodada, setPontuacoesRodada] = useState<RodadaChartData[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalPlayers: 0,
     totalClubs: 0,
@@ -125,6 +139,35 @@ const AdminDashboard = () => {
 
       if (posicoesData) {
         setPosicoes(posicoesData);
+      }
+
+      // Fetch pontuações por rodada
+      const { data: pontuacoesData } = await supabase
+        .from("atleta_pontuacoes")
+        .select("rodada, pontos, atleta_id")
+        .order("rodada", { ascending: true });
+
+      if (pontuacoesData && pontuacoesData.length > 0) {
+        // Agrupa por rodada
+        const rodadaMap = new Map<number, { total: number; count: number }>();
+        pontuacoesData.forEach((p: PontuacaoRodada) => {
+          const existing = rodadaMap.get(p.rodada) || { total: 0, count: 0 };
+          rodadaMap.set(p.rodada, {
+            total: existing.total + (p.pontos || 0),
+            count: existing.count + 1,
+          });
+        });
+
+        const chartData: RodadaChartData[] = Array.from(rodadaMap.entries())
+          .sort((a, b) => a[0] - b[0])
+          .map(([rodada, data]) => ({
+            rodada: `R${rodada}`,
+            mediaPontos: data.count > 0 ? Number((data.total / data.count).toFixed(2)) : 0,
+            totalPontos: Number(data.total.toFixed(2)),
+            jogadores: data.count,
+          }));
+
+        setPontuacoesRodada(chartData);
       }
 
       // Calculate sync stats
@@ -281,6 +324,85 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Evolution by Round Chart */}
+        {pontuacoesRodada.length > 0 && (
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-primary" />
+                Evolução de Pontuação por Rodada
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={pontuacoesRodada}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="rodada" 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      yAxisId="left"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      yAxisId="right"
+                      orientation="right"
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                      labelStyle={{ color: "hsl(var(--foreground))" }}
+                      formatter={(value: number, name: string) => {
+                        const label = name === "mediaPontos" ? "Média" : name === "totalPontos" ? "Total" : "Jogadores";
+                        return [value.toFixed(2), label];
+                      }}
+                    />
+                    <Legend 
+                      formatter={(value) => {
+                        if (value === "mediaPontos") return "Média de Pontos";
+                        if (value === "totalPontos") return "Total de Pontos";
+                        return value;
+                      }}
+                    />
+                    <Line
+                      yAxisId="left"
+                      type="monotone"
+                      dataKey="mediaPontos"
+                      stroke="hsl(var(--primary))"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--primary))", r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="mediaPontos"
+                    />
+                    <Line
+                      yAxisId="right"
+                      type="monotone"
+                      dataKey="totalPontos"
+                      stroke="hsl(var(--chart-2))"
+                      strokeWidth={2}
+                      dot={{ fill: "hsl(var(--chart-2))", r: 4 }}
+                      activeDot={{ r: 6 }}
+                      name="totalPontos"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Média de pontos (esquerda) e total de pontos (direita) por rodada
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Player Scoring Charts */}
         <div>
