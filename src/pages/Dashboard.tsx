@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Player {
   id: number;
@@ -13,6 +14,7 @@ interface Player {
   name: string;
   fullName: string;
   position: string;
+  positionAbbr?: string;
   team: string;
   teamName: string;
   shield?: string;
@@ -24,6 +26,11 @@ interface Player {
   average: number;
   games: number;
   totalPoints: number;
+  // Métricas avançadas
+  potentialScore?: number;
+  consistency?: number;
+  regularity?: number;
+  weightedAverage?: number;
 }
 
 const Dashboard = () => {
@@ -188,8 +195,14 @@ const Dashboard = () => {
             TOP ATLETAS DO CARTOLA
           </h2>
           <p className="text-muted-foreground text-lg">
-            Dados reais da API oficial do Cartola FC
+            Análise técnica baseada em performance real e estatísticas avançadas
           </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            <span className="bg-secondary/50 px-2 py-1 rounded">📊 Média ponderada (rodadas recentes)</span>
+            <span className="bg-secondary/50 px-2 py-1 rounded">🎯 Consistência</span>
+            <span className="bg-secondary/50 px-2 py-1 rounded">📈 Tendência de forma</span>
+            <span className="bg-secondary/50 px-2 py-1 rounded">💰 Custo-benefício</span>
+          </div>
         </div>
 
         {players.length === 0 ? (
@@ -203,109 +216,177 @@ const Dashboard = () => {
             </Button>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {players.map((player) => (
-              <Card key={player.id} className="bg-card border-2 border-border hover:border-primary transition-all duration-300 shadow-lg hover:shadow-neon overflow-hidden">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl font-black text-neon-cyan">
-                        #{player.rank}
-                      </span>
-                      {player.shield && (
-                        <img 
-                          src={player.shield} 
-                          alt={player.teamName}
-                          className="w-8 h-8 object-contain"
-                        />
-                      )}
-                      <div>
-                        <h3 className="font-bold text-foreground text-lg">
-                          {player.name}
-                        </h3>
-                        <p className="text-muted-foreground text-sm">
-                          {player.position} • {player.team}
-                        </p>
+          <TooltipProvider>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {players.map((player) => (
+                <Card key={player.id} className="bg-card border-2 border-border hover:border-primary transition-all duration-300 shadow-lg hover:shadow-neon overflow-hidden">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl font-black text-neon-cyan">
+                          #{player.rank}
+                        </span>
+                        {player.shield && (
+                          <img 
+                            src={player.shield} 
+                            alt={player.teamName}
+                            className="w-8 h-8 object-contain"
+                          />
+                        )}
+                        <div>
+                          <h3 className="font-bold text-foreground text-lg">
+                            {player.name}
+                          </h3>
+                          <p className="text-muted-foreground text-sm">
+                            {player.position} • {player.team}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground text-sm font-medium">
-                        Previsão
-                      </span>
-                      <span className="text-neon-green font-bold text-xl">
-                        {player.predictedScore.toFixed(1)}
-                      </span>
-                    </div>
+                    <div className="space-y-3">
+                      {/* Score de Potencial */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="flex justify-between items-center bg-primary/10 p-2 rounded-lg cursor-help">
+                            <span className="text-muted-foreground text-sm font-medium flex items-center gap-1">
+                              <Zap className="h-4 w-4 text-neon-yellow" />
+                              Potencial
+                            </span>
+                            <span className="text-neon-green font-bold text-xl">
+                              {player.potentialScore?.toFixed(1) || player.predictedScore.toFixed(1)}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-popover border-border max-w-xs">
+                          <p className="text-xs">Score calculado com base em média ponderada, consistência, regularidade, tendência e custo-benefício</p>
+                        </TooltipContent>
+                      </Tooltip>
 
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
+                      {/* Métricas avançadas em grid */}
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="bg-secondary/30 p-2 rounded cursor-help">
+                              <span className="text-muted-foreground text-xs flex items-center gap-1">
+                                <Activity className="h-3 w-3" />
+                                Consistência
+                              </span>
+                              <span className="text-foreground font-bold">
+                                {player.consistency?.toFixed(0) || '-'}%
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-popover border-border">
+                            <p className="text-xs">Menor variação = mais consistente</p>
+                          </TooltipContent>
+                        </Tooltip>
+
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="bg-secondary/30 p-2 rounded cursor-help">
+                              <span className="text-muted-foreground text-xs flex items-center gap-1">
+                                <Target className="h-3 w-3" />
+                                Regularidade
+                              </span>
+                              <span className="text-foreground font-bold">
+                                {player.regularity?.toFixed(0) || '-'}%
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent className="bg-popover border-border">
+                            <p className="text-xs">% de jogos com pontuação positiva</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+
+                      {/* Probabilidade */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground text-sm">
+                            Prob. alta pont.
+                          </span>
+                          <span className="text-foreground font-bold">
+                            {player.probability}%
+                          </span>
+                        </div>
+                        <Progress value={player.probability} className="h-2" />
+                      </div>
+
+                      {/* Dados base */}
+                      <div className="flex justify-between items-center pt-2 border-t border-border">
                         <span className="text-muted-foreground text-sm">
-                          Probabilidade
+                          Média Pond.
                         </span>
                         <span className="text-foreground font-bold">
-                          {player.probability}%
+                          {player.weightedAverage?.toFixed(2) || player.average?.toFixed(2) || '0.00'}
                         </span>
                       </div>
-                      <Progress value={player.probability} className="h-2" />
-                    </div>
 
-                    <div className="flex justify-between items-center pt-2 border-t border-border">
-                      <span className="text-muted-foreground text-sm">
-                        Média
-                      </span>
-                      <span className="text-foreground font-bold">
-                        {player.average?.toFixed(2) || '0.00'}
-                      </span>
-                    </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground text-sm">
+                          Média Geral
+                        </span>
+                        <span className="text-muted-foreground">
+                          {player.average?.toFixed(2) || '0.00'}
+                        </span>
+                      </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground text-sm">
-                        Preço
-                      </span>
-                      <span className="text-neon-yellow font-bold">
-                        C$ {player.price?.toFixed(1) || '0.0'}
-                      </span>
-                    </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground text-sm">
+                          Jogos
+                        </span>
+                        <span className="text-muted-foreground">
+                          {player.games || 0}
+                        </span>
+                      </div>
 
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground text-sm">
-                        Tendência
-                      </span>
-                      <div className="flex items-center gap-1">
-                        {player.trend === 'up' && (
-                          <>
-                            <TrendingUp className="h-4 w-4 text-neon-green" />
-                            <span className="text-neon-green text-sm font-bold">
-                              Alta
-                            </span>
-                          </>
-                        )}
-                        {player.trend === 'down' && (
-                          <>
-                            <TrendingDown className="h-4 w-4 text-neon-red" />
-                            <span className="text-neon-red text-sm font-bold">
-                              Baixa
-                            </span>
-                          </>
-                        )}
-                        {player.trend === 'stable' && (
-                          <>
-                            <Minus className="h-4 w-4 text-neon-yellow" />
-                            <span className="text-neon-yellow text-sm font-bold">
-                              Estável
-                            </span>
-                          </>
-                        )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground text-sm">
+                          Preço
+                        </span>
+                        <span className="text-neon-yellow font-bold">
+                          C$ {player.price?.toFixed(1) || '0.0'}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground text-sm">
+                          Tendência
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {player.trend === 'up' && (
+                            <>
+                              <TrendingUp className="h-4 w-4 text-neon-green" />
+                              <span className="text-neon-green text-sm font-bold">
+                                Em alta
+                              </span>
+                            </>
+                          )}
+                          {player.trend === 'down' && (
+                            <>
+                              <TrendingDown className="h-4 w-4 text-neon-red" />
+                              <span className="text-neon-red text-sm font-bold">
+                                Em baixa
+                              </span>
+                            </>
+                          )}
+                          {player.trend === 'stable' && (
+                            <>
+                              <Minus className="h-4 w-4 text-neon-yellow" />
+                              <span className="text-neon-yellow text-sm font-bold">
+                                Estável
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </TooltipProvider>
         )}
       </div>
     </div>
