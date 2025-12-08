@@ -1,7 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Users, 
   UserCheck, 
@@ -10,7 +15,9 @@ import {
   RefreshCw,
   AlertCircle,
   Star,
-  Trophy
+  Trophy,
+  Filter,
+  X
 } from "lucide-react";
 import {
   LineChart,
@@ -71,6 +78,18 @@ interface RodadaChartData {
   mediaPontos: number;
   totalPontos: number;
   jogadores: number;
+  [key: string]: string | number;
+}
+
+interface AtletaSimples {
+  id: number;
+  apelido: string;
+}
+
+interface PontuacaoRaw {
+  rodada: number;
+  pontos: number;
+  atleta_id: number | null;
 }
 
 const CHART_COLORS = [
@@ -79,6 +98,11 @@ const CHART_COLORS = [
   "hsl(var(--chart-3))",
   "hsl(var(--chart-4))",
   "hsl(var(--chart-5))",
+  "hsl(280, 70%, 60%)",
+  "hsl(200, 70%, 50%)",
+  "hsl(340, 70%, 50%)",
+  "hsl(160, 70%, 40%)",
+  "hsl(30, 80%, 50%)",
 ];
 
 const AdminDashboard = () => {
@@ -86,6 +110,10 @@ const AdminDashboard = () => {
   const [topPlayers, setTopPlayers] = useState<Atleta[]>([]);
   const [posicoes, setPosicoes] = useState<Posicao[]>([]);
   const [pontuacoesRodada, setPontuacoesRodada] = useState<RodadaChartData[]>([]);
+  const [pontuacoesRaw, setPontuacoesRaw] = useState<PontuacaoRaw[]>([]);
+  const [atletasDisponiveis, setAtletasDisponiveis] = useState<AtletaSimples[]>([]);
+  const [selectedAtletas, setSelectedAtletas] = useState<number[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [stats, setStats] = useState<Stats>({
     totalPlayers: 0,
     totalClubs: 0,
@@ -148,7 +176,24 @@ const AdminDashboard = () => {
         .order("rodada", { ascending: true });
 
       if (pontuacoesData && pontuacoesData.length > 0) {
-        // Agrupa por rodada
+        setPontuacoesRaw(pontuacoesData);
+
+        // Buscar atletas únicos que têm pontuações
+        const atletaIds = [...new Set(pontuacoesData.map(p => p.atleta_id).filter(Boolean))] as number[];
+        
+        if (atletaIds.length > 0) {
+          const { data: atletasData } = await supabase
+            .from("atletas")
+            .select("id, apelido")
+            .in("id", atletaIds.slice(0, 100)) // Limita a 100 para performance
+            .order("apelido", { ascending: true });
+
+          if (atletasData) {
+            setAtletasDisponiveis(atletasData);
+          }
+        }
+
+        // Agrupa por rodada (dados gerais)
         const rodadaMap = new Map<number, { total: number; count: number }>();
         pontuacoesData.forEach((p: PontuacaoRodada) => {
           const existing = rodadaMap.get(p.rodada) || { total: 0, count: 0 };
@@ -239,9 +284,60 @@ const AdminDashboard = () => {
   const priceDistributionData = priceRanges.map((range) => ({
     range: range.range,
     count: topPlayers.filter(
-      (p) => (p.preco || 0) >= range.min && (p.preco || 0) < range.max
+      (p) => (p.preco ?? 0) >= range.min && (p.preco ?? 0) < range.max
     ).length,
   }));
+
+  // Dados do gráfico filtrado por jogadores selecionados
+  const filteredChartData = useMemo(() => {
+    if (selectedAtletas.length === 0) {
+      return pontuacoesRodada;
+    }
+
+    // Agrupa por rodada para cada atleta selecionado
+    const rodadaMap = new Map<number, RodadaChartData>();
+    
+    pontuacoesRaw.forEach((p) => {
+      if (!selectedAtletas.includes(p.atleta_id as number)) return;
+      
+      const existing = rodadaMap.get(p.rodada) || {
+        rodada: `R${p.rodada}`,
+        mediaPontos: 0,
+        totalPontos: 0,
+        jogadores: 0,
+      };
+      
+      existing.totalPontos += p.pontos || 0;
+      existing.jogadores += 1;
+      
+      // Adiciona pontos individuais por atleta
+      const atleta = atletasDisponiveis.find(a => a.id === p.atleta_id);
+      if (atleta) {
+        existing[`atleta_${p.atleta_id}`] = p.pontos || 0;
+      }
+      
+      rodadaMap.set(p.rodada, existing);
+    });
+
+    return Array.from(rodadaMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([_, data]) => ({
+        ...data,
+        mediaPontos: data.jogadores > 0 ? Number((data.totalPontos / data.jogadores).toFixed(2)) : 0,
+      }));
+  }, [selectedAtletas, pontuacoesRaw, pontuacoesRodada, atletasDisponiveis]);
+
+  const toggleAtleta = (atletaId: number) => {
+    setSelectedAtletas(prev => 
+      prev.includes(atletaId) 
+        ? prev.filter(id => id !== atletaId)
+        : prev.length < 10 ? [...prev, atletaId] : prev
+    );
+  };
+
+  const clearFilters = () => {
+    setSelectedAtletas([]);
+  };
 
   if (loading) {
     return (
@@ -328,16 +424,87 @@ const AdminDashboard = () => {
         {/* Evolution by Round Chart */}
         {pontuacoesRodada.length > 0 && (
           <Card className="bg-card border-border">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-foreground flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-primary" />
                 Evolução de Pontuação por Rodada
               </CardTitle>
+              <div className="flex items-center gap-2">
+                {selectedAtletas.length > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearFilters}
+                    className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Limpar ({selectedAtletas.length})
+                  </Button>
+                )}
+                <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-8">
+                      <Filter className="h-4 w-4 mr-2" />
+                      Filtrar Jogadores
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-0 bg-popover border-border z-50" align="end">
+                    <Command className="bg-transparent">
+                      <CommandInput placeholder="Buscar jogador..." className="border-b border-border" />
+                      <CommandList className="max-h-64">
+                        <CommandEmpty>Nenhum jogador encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {atletasDisponiveis.map((atleta) => (
+                            <CommandItem
+                              key={atleta.id}
+                              onSelect={() => toggleAtleta(atleta.id)}
+                              className="cursor-pointer flex items-center gap-2"
+                            >
+                              <Checkbox 
+                                checked={selectedAtletas.includes(atleta.id)}
+                                className="pointer-events-none"
+                              />
+                              <span>{atleta.apelido}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                    {selectedAtletas.length >= 10 && (
+                      <p className="text-xs text-muted-foreground p-2 border-t border-border">
+                        Máximo de 10 jogadores selecionados
+                      </p>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
             </CardHeader>
+            
+            {/* Selected players badges */}
+            {selectedAtletas.length > 0 && (
+              <div className="px-6 pb-2 flex flex-wrap gap-1">
+                {selectedAtletas.map((atletaId, index) => {
+                  const atleta = atletasDisponiveis.find(a => a.id === atletaId);
+                  return (
+                    <Badge 
+                      key={atletaId} 
+                      variant="secondary"
+                      className="text-xs cursor-pointer hover:bg-destructive hover:text-destructive-foreground"
+                      style={{ borderLeft: `3px solid ${CHART_COLORS[index % CHART_COLORS.length]}` }}
+                      onClick={() => toggleAtleta(atletaId)}
+                    >
+                      {atleta?.apelido || `ID ${atletaId}`}
+                      <X className="h-3 w-3 ml-1" />
+                    </Badge>
+                  );
+                })}
+              </div>
+            )}
+            
             <CardContent>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={pontuacoesRodada}>
+                  <LineChart data={filteredChartData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis 
                       dataKey="rodada" 
@@ -345,13 +512,6 @@ const AdminDashboard = () => {
                       fontSize={12}
                     />
                     <YAxis 
-                      yAxisId="left"
-                      stroke="hsl(var(--muted-foreground))"
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      yAxisId="right"
-                      orientation="right"
                       stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                     />
@@ -363,42 +523,72 @@ const AdminDashboard = () => {
                       }}
                       labelStyle={{ color: "hsl(var(--foreground))" }}
                       formatter={(value: number, name: string) => {
-                        const label = name === "mediaPontos" ? "Média" : name === "totalPontos" ? "Total" : "Jogadores";
+                        if (name.startsWith("atleta_")) {
+                          const atletaId = parseInt(name.replace("atleta_", ""));
+                          const atleta = atletasDisponiveis.find(a => a.id === atletaId);
+                          return [value.toFixed(2), atleta?.apelido || name];
+                        }
+                        const label = name === "mediaPontos" ? "Média" : name === "totalPontos" ? "Total" : name;
                         return [value.toFixed(2), label];
                       }}
                     />
                     <Legend 
                       formatter={(value) => {
+                        if (value.startsWith("atleta_")) {
+                          const atletaId = parseInt(value.replace("atleta_", ""));
+                          const atleta = atletasDisponiveis.find(a => a.id === atletaId);
+                          return atleta?.apelido || value;
+                        }
                         if (value === "mediaPontos") return "Média de Pontos";
                         if (value === "totalPontos") return "Total de Pontos";
                         return value;
                       }}
                     />
-                    <Line
-                      yAxisId="left"
-                      type="monotone"
-                      dataKey="mediaPontos"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="mediaPontos"
-                    />
-                    <Line
-                      yAxisId="right"
-                      type="monotone"
-                      dataKey="totalPontos"
-                      stroke="hsl(var(--chart-2))"
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--chart-2))", r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="totalPontos"
-                    />
+                    
+                    {selectedAtletas.length === 0 ? (
+                      <>
+                        <Line
+                          type="monotone"
+                          dataKey="mediaPontos"
+                          stroke="hsl(var(--primary))"
+                          strokeWidth={2}
+                          dot={{ fill: "hsl(var(--primary))", r: 4 }}
+                          activeDot={{ r: 6 }}
+                          name="mediaPontos"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="totalPontos"
+                          stroke="hsl(var(--chart-2))"
+                          strokeWidth={2}
+                          dot={{ fill: "hsl(var(--chart-2))", r: 4 }}
+                          activeDot={{ r: 6 }}
+                          name="totalPontos"
+                        />
+                      </>
+                    ) : (
+                      selectedAtletas.map((atletaId, index) => (
+                        <Line
+                          key={atletaId}
+                          type="monotone"
+                          dataKey={`atleta_${atletaId}`}
+                          stroke={CHART_COLORS[index % CHART_COLORS.length]}
+                          strokeWidth={2}
+                          dot={{ fill: CHART_COLORS[index % CHART_COLORS.length], r: 4 }}
+                          activeDot={{ r: 6 }}
+                          name={`atleta_${atletaId}`}
+                          connectNulls
+                        />
+                      ))
+                    )}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
               <p className="text-xs text-muted-foreground text-center mt-2">
-                Média de pontos (esquerda) e total de pontos (direita) por rodada
+                {selectedAtletas.length === 0 
+                  ? "Média de pontos e total de pontos por rodada (geral)"
+                  : `Pontuação individual por rodada (${selectedAtletas.length} jogador${selectedAtletas.length > 1 ? 'es' : ''} selecionado${selectedAtletas.length > 1 ? 's' : ''})`
+                }
               </p>
             </CardContent>
           </Card>
