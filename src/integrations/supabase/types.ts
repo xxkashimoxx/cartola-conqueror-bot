@@ -115,6 +115,44 @@ export type Database = {
           },
         ]
       }
+      ausencias: {
+        Row: {
+          atleta_id: number | null
+          created_at: string
+          id: string
+          nota: string | null
+          probabilidade: number | null
+          rodada: number
+          tipo: string
+        }
+        Insert: {
+          atleta_id?: number | null
+          created_at?: string
+          id?: string
+          nota?: string | null
+          probabilidade?: number | null
+          rodada: number
+          tipo: string
+        }
+        Update: {
+          atleta_id?: number | null
+          created_at?: string
+          id?: string
+          nota?: string | null
+          probabilidade?: number | null
+          rodada?: number
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ausencias_atleta_id_fkey"
+            columns: ["atleta_id"]
+            isOneToOne: false
+            referencedRelation: "atletas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clubes: {
         Row: {
           abreviacao: string
@@ -169,6 +207,101 @@ export type Database = {
         }
         Relationships: []
       }
+      oportunidades: {
+        Row: {
+          atleta_id: number | null
+          created_at: string
+          id: string
+          nota: string | null
+          rodada: number
+          score: number | null
+          tipo: string
+        }
+        Insert: {
+          atleta_id?: number | null
+          created_at?: string
+          id?: string
+          nota?: string | null
+          rodada: number
+          score?: number | null
+          tipo: string
+        }
+        Update: {
+          atleta_id?: number | null
+          created_at?: string
+          id?: string
+          nota?: string | null
+          rodada?: number
+          score?: number | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oportunidades_atleta_id_fkey"
+            columns: ["atleta_id"]
+            isOneToOne: false
+            referencedRelation: "atletas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partidas: {
+        Row: {
+          clean_sheet_casa: number | null
+          clean_sheet_fora: number | null
+          created_at: string
+          data_partida: string | null
+          id: string
+          rodada: number
+          time_casa_id: number | null
+          time_fora_id: number | null
+          updated_at: string
+          xg_casa: number | null
+          xg_fora: number | null
+        }
+        Insert: {
+          clean_sheet_casa?: number | null
+          clean_sheet_fora?: number | null
+          created_at?: string
+          data_partida?: string | null
+          id?: string
+          rodada: number
+          time_casa_id?: number | null
+          time_fora_id?: number | null
+          updated_at?: string
+          xg_casa?: number | null
+          xg_fora?: number | null
+        }
+        Update: {
+          clean_sheet_casa?: number | null
+          clean_sheet_fora?: number | null
+          created_at?: string
+          data_partida?: string | null
+          id?: string
+          rodada?: number
+          time_casa_id?: number | null
+          time_fora_id?: number | null
+          updated_at?: string
+          xg_casa?: number | null
+          xg_fora?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partidas_time_casa_id_fkey"
+            columns: ["time_casa_id"]
+            isOneToOne: false
+            referencedRelation: "clubes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partidas_time_fora_id_fkey"
+            columns: ["time_fora_id"]
+            isOneToOne: false
+            referencedRelation: "clubes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posicoes: {
         Row: {
           abreviacao: string
@@ -195,6 +328,7 @@ export type Database = {
           full_name: string | null
           id: string
           is_active: boolean
+          plan: Database["public"]["Enums"]["user_plan"]
           updated_at: string
           user_id: string
         }
@@ -205,6 +339,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_active?: boolean
+          plan?: Database["public"]["Enums"]["user_plan"]
           updated_at?: string
           user_id: string
         }
@@ -215,6 +350,7 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_active?: boolean
+          plan?: Database["public"]["Enums"]["user_plan"]
           updated_at?: string
           user_id?: string
         }
@@ -286,6 +422,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      user_plan: "FREE" | "PRO" | "PREMIUM" | "MASTER"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -414,6 +551,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      user_plan: ["FREE", "PRO", "PREMIUM", "MASTER"],
     },
   },
 } as const
