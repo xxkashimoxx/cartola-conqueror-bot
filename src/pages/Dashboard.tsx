@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Player {
@@ -160,6 +160,22 @@ const Dashboard = () => {
               >
                 <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? 'Sincronizando...' : 'Atualizar Dados'}
+              </Button>
+              <Button
+                onClick={() => navigate("/confrontos")}
+                variant="outline"
+                className="border-2 border-border hover:bg-card"
+              >
+                <Swords className="mr-2 h-4 w-4" />
+                Confrontos
+              </Button>
+              <Button
+                onClick={() => navigate("/ausencias")}
+                variant="outline"
+                className="border-2 border-neon-red/50 hover:bg-card"
+              >
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Ausências
               </Button>
               <Button
                 onClick={() => navigate("/compare")}
