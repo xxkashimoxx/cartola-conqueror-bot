@@ -57,7 +57,7 @@ const Auth = () => {
 
         toast({
           title: "Conta criada",
-          description: "Bem-vindo ao XXKASHIMOXX!",
+          description: "Bem-vindo ao Precisão > Clubismo!",
         });
         navigate("/dashboard");
       }
@@ -80,7 +80,7 @@ const Auth = () => {
         <div className="bg-card border-2 border-primary rounded-lg p-8 shadow-neon">
           <div className="text-center mb-8">
             <h1 className="text-4xl font-black text-neon-cyan mb-2 uppercase animate-pulse-neon">
-              XXKASHIMOXX
+              Precisão &gt; Clubismo
             </h1>
             <p className="text-muted-foreground">
               {isLogin ? "Entre para dominar" : "Registre-se para destruir"}
