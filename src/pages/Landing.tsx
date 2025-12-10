@@ -15,7 +15,7 @@ const Landing = () => {
         <div className="container mx-auto px-4 py-20 relative z-10">
           <div className="text-center space-y-8">
             <h1 className="text-neon-cyan animate-pulse-neon font-black uppercase tracking-wider">
-              XXKASHIMOXX
+              Precisão &gt; Clubismo
             </h1>
             <p className="text-2xl md:text-3xl text-muted-foreground font-bold">
               A MÁQUINA DE MITADAS DO CARTOLA
