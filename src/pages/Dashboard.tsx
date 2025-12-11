@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle, BarChart3 } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle, BarChart3, LineChart } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Player {
@@ -184,6 +184,14 @@ const Dashboard = () => {
               >
                 <BarChart3 className="mr-2 h-4 w-4" />
                 Simulador
+              </Button>
+              <Button
+                onClick={() => navigate("/mercado")}
+                variant="outline"
+                className="border-2 border-green-500/50 hover:bg-card"
+              >
+                <LineChart className="mr-2 h-4 w-4 text-green-400" />
+                Mercado
               </Button>
               <Button
                 onClick={() => navigate("/compare")}
