@@ -12,6 +12,7 @@ import Compare from "./pages/Compare";
 import TeamBuilder from "./pages/TeamBuilder";
 import Confrontos from "./pages/Confrontos";
 import RadarAusencias from "./pages/RadarAusencias";
+import Simulador from "./pages/Simulador";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSync from "./pages/admin/AdminSync";
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/team-builder" element={<TeamBuilder />} />
             <Route path="/confrontos" element={<Confrontos />} />
             <Route path="/ausencias" element={<RadarAusencias />} />
+            <Route path="/simulador" element={<Simulador />} />
             
             {/* Admin routes */}
             <Route
