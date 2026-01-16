@@ -206,41 +206,54 @@ const AdminUsers = () => {
       return;
     }
 
+    if (newUserPassword.length < 6) {
+      toast({
+        title: "Erro",
+        description: "A senha deve ter no mínimo 6 caracteres",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCreating(true);
     try {
-      // Create user via Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUserEmail,
-        password: newUserPassword,
-        options: {
-          data: {
-            full_name: newUserName,
+      // Get current session token
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.access_token) {
+        throw new Error("Sessão não encontrada");
+      }
+
+      // Call edge function to create user
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
           },
-        },
+          body: JSON.stringify({
+            email: newUserEmail,
+            password: newUserPassword,
+            full_name: newUserName,
+            role: newUserRole,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao criar usuário");
+      }
+
+      toast({
+        title: "Sucesso",
+        description: `Usuário ${newUserEmail} criado com sucesso`,
       });
 
-      if (authError) throw authError;
-
-      if (authData.user) {
-        // If role is admin, update the user_roles table
-        if (newUserRole === "admin") {
-          const { error: roleError } = await supabase
-            .from("user_roles")
-            .update({ role: "admin" })
-            .eq("user_id", authData.user.id);
-
-          if (roleError) {
-            console.error("Error setting admin role:", roleError);
-          }
-        }
-
-        toast({
-          title: "Sucesso",
-          description: `Usuário ${newUserEmail} criado com sucesso`,
-        });
-
-        fetchUsers();
-      }
+      fetchUsers();
     } catch (error: any) {
       console.error("Error creating user:", error);
       toast({
