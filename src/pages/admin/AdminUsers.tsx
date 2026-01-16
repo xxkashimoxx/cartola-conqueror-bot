@@ -4,6 +4,8 @@ import AdminLayout from "@/components/admin/AdminLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -34,7 +36,8 @@ import {
   User, 
   UserX, 
   UserCheck,
-  MoreVertical
+  MoreVertical,
+  UserPlus
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -59,8 +62,13 @@ const AdminUsers = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const [dialogType, setDialogType] = useState<"role" | "status" | null>(null);
+  const [dialogType, setDialogType] = useState<"role" | "status" | "create" | null>(null);
   const [newRole, setNewRole] = useState<AppRole>("user");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserName, setNewUserName] = useState("");
+  const [newUserRole, setNewUserRole] = useState<AppRole>("user");
+  const [creating, setCreating] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -180,6 +188,72 @@ const AdminUsers = () => {
     setDialogType("status");
   };
 
+  const openCreateDialog = () => {
+    setNewUserEmail("");
+    setNewUserPassword("");
+    setNewUserName("");
+    setNewUserRole("user");
+    setDialogType("create");
+  };
+
+  const handleCreateUser = async () => {
+    if (!newUserEmail || !newUserPassword) {
+      toast({
+        title: "Erro",
+        description: "Email e senha são obrigatórios",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCreating(true);
+    try {
+      // Create user via Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newUserEmail,
+        password: newUserPassword,
+        options: {
+          data: {
+            full_name: newUserName,
+          },
+        },
+      });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        // If role is admin, update the user_roles table
+        if (newUserRole === "admin") {
+          const { error: roleError } = await supabase
+            .from("user_roles")
+            .update({ role: "admin" })
+            .eq("user_id", authData.user.id);
+
+          if (roleError) {
+            console.error("Error setting admin role:", roleError);
+          }
+        }
+
+        toast({
+          title: "Sucesso",
+          description: `Usuário ${newUserEmail} criado com sucesso`,
+        });
+
+        fetchUsers();
+      }
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      toast({
+        title: "Erro",
+        description: error.message || "Não foi possível criar o usuário",
+        variant: "destructive",
+      });
+    } finally {
+      setCreating(false);
+      setDialogType(null);
+    }
+  };
+
   if (loading) {
     return (
       <AdminLayout>
@@ -202,10 +276,16 @@ const AdminUsers = () => {
               {users.length} usuários registrados
             </p>
           </div>
-          <Button onClick={fetchUsers} variant="outline" className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Atualizar
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={openCreateDialog} className="gap-2 bg-primary hover:bg-primary/80">
+              <UserPlus className="h-4 w-4" />
+              Novo Usuário
+            </Button>
+            <Button onClick={fetchUsers} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Atualizar
+            </Button>
+          </div>
         </div>
 
         <Card className="bg-card border-border">
@@ -382,6 +462,93 @@ const AdminUsers = () => {
                 onClick={handleStatusChange}
               >
                 {selectedUser?.is_active ? "Desativar" : "Ativar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Create User Dialog */}
+        <Dialog open={dialogType === "create"} onOpenChange={() => setDialogType(null)}>
+          <DialogContent className="bg-card border-border">
+            <DialogHeader>
+              <DialogTitle className="text-foreground">Criar Novo Usuário</DialogTitle>
+              <DialogDescription className="text-muted-foreground">
+                Preencha os dados para criar um novo usuário no sistema.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="email@exemplo.com"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  className="bg-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Senha *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="Mínimo 6 caracteres"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  className="bg-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Nome Completo</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="Nome do usuário"
+                  value={newUserName}
+                  onChange={(e) => setNewUserName(e.target.value)}
+                  className="bg-background border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Nível de Acesso</Label>
+                <Select value={newUserRole} onValueChange={(v) => setNewUserRole(v as AppRole)}>
+                  <SelectTrigger className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Usuário
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="admin">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4" />
+                        Admin
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogType(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleCreateUser} disabled={creating}>
+                {creating ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Criando...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Criar Usuário
+                  </>
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>

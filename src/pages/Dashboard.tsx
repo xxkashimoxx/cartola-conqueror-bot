@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle, BarChart3, LineChart, Sparkles } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle, BarChart3, LineChart, Sparkles, Shield } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Player {
@@ -40,6 +41,7 @@ const Dashboard = () => {
   const [syncing, setSyncing] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -216,6 +218,16 @@ const Dashboard = () => {
                 <Trophy className="mr-2 h-4 w-4" />
                 Meu Time
               </Button>
+              {isAdmin && (
+                <Button
+                  onClick={() => navigate("/admin")}
+                  variant="outline"
+                  className="border-2 border-primary/50 hover:bg-primary/10"
+                >
+                  <Shield className="mr-2 h-4 w-4 text-primary" />
+                  Admin
+                </Button>
+              )}
               <Button
                 onClick={handleLogout}
                 variant="destructive"
