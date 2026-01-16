@@ -15,6 +15,7 @@ import RadarAusencias from "./pages/RadarAusencias";
 import Simulador from "./pages/Simulador";
 import MercadoInteligente from "./pages/MercadoInteligente";
 import Oportunidades from "./pages/Oportunidades";
+import GeradorEstilo from "./pages/GeradorEstilo";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSync from "./pages/admin/AdminSync";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/simulador" element={<Simulador />} />
             <Route path="/mercado" element={<MercadoInteligente />} />
             <Route path="/oportunidades" element={<Oportunidades />} />
+            <Route path="/gerador-estilo" element={<GeradorEstilo />} />
             
             {/* Admin routes */}
             <Route

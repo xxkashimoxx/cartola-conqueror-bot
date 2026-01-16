@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle, BarChart3, LineChart, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle, BarChart3, LineChart, Sparkles, Palette } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface Player {
@@ -200,6 +200,14 @@ const Dashboard = () => {
               >
                 <Sparkles className="mr-2 h-4 w-4 text-yellow-400" />
                 Oportunidades
+              </Button>
+              <Button
+                onClick={() => navigate("/gerador-estilo")}
+                variant="outline"
+                className="border-2 border-purple-500/50 hover:bg-card"
+              >
+                <Palette className="mr-2 h-4 w-4 text-purple-400" />
+                Gerador Estilo
               </Button>
               <Button
                 onClick={() => navigate("/compare")}

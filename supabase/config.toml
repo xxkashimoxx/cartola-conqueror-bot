@@ -1,1 +1,4 @@
 project_id = "idpeugtjwlrnylnmihoc"
+
+[functions.gerador-estilo]
+verify_jwt = false
