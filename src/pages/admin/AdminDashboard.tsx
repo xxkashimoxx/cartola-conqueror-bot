@@ -44,6 +44,18 @@ interface SyncAnalytics {
   synced_at: string;
 }
 
+interface UserStats {
+  totalUsers: number;
+  activeUsers: number;
+  admins: number;
+  newUsersThisMonth: number;
+}
+
+interface UserRegistrationData {
+  date: string;
+  count: number;
+}
+
 interface Stats {
   totalPlayers: number;
   totalClubs: number;
@@ -114,6 +126,13 @@ const AdminDashboard = () => {
   const [atletasDisponiveis, setAtletasDisponiveis] = useState<AtletaSimples[]>([]);
   const [selectedAtletas, setSelectedAtletas] = useState<number[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [userStats, setUserStats] = useState<UserStats>({
+    totalUsers: 0,
+    activeUsers: 0,
+    admins: 0,
+    newUsersThisMonth: 0,
+  });
+  const [registrationData, setRegistrationData] = useState<UserRegistrationData[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalPlayers: 0,
     totalClubs: 0,
@@ -124,7 +143,62 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchAnalytics();
+    fetchUserStats();
   }, []);
+
+  const fetchUserStats = async () => {
+    try {
+      // Fetch all profiles
+      const { data: profiles, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, is_active, created_at");
+
+      if (profilesError) throw profilesError;
+
+      // Fetch admin roles
+      const { data: adminRoles, error: rolesError } = await supabase
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "admin");
+
+      if (rolesError) throw rolesError;
+
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const totalUsers = profiles?.length || 0;
+      const activeUsers = profiles?.filter(p => p.is_active).length || 0;
+      const admins = adminRoles?.length || 0;
+      const newUsersThisMonth = profiles?.filter(p => 
+        new Date(p.created_at) >= startOfMonth
+      ).length || 0;
+
+      setUserStats({
+        totalUsers,
+        activeUsers,
+        admins,
+        newUsersThisMonth,
+      });
+
+      // Generate registration data for the last 30 days
+      const last30Days: UserRegistrationData[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        const count = profiles?.filter(p => 
+          p.created_at.split('T')[0] === dateStr
+        ).length || 0;
+        last30Days.push({
+          date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          count,
+        });
+      }
+      setRegistrationData(last30Days);
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+    }
+  };
 
   const fetchAnalytics = async () => {
     try {
@@ -364,9 +438,45 @@ const AdminDashboard = () => {
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total de Jogadores
+                Total de Usuários
               </CardTitle>
               <Users className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                {userStats.totalUsers}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                +{userStats.newUsersThisMonth} este mês
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Usuários Ativos
+              </CardTitle>
+              <UserCheck className="h-4 w-4 text-neon-green" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">
+                {userStats.activeUsers}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {userStats.totalUsers > 0 
+                  ? Math.round((userStats.activeUsers / userStats.totalUsers) * 100)
+                  : 0}% do total
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Total de Jogadores
+              </CardTitle>
+              <Database className="h-4 w-4 text-neon-yellow" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-foreground">
@@ -378,35 +488,7 @@ const AdminDashboard = () => {
           <Card className="bg-card border-border">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Clubes
-              </CardTitle>
-              <Database className="h-4 w-4 text-neon-green" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
-                {stats.totalClubs}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Sincronizações
-              </CardTitle>
-              <RefreshCw className="h-4 w-4 text-neon-yellow" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
-                {stats.totalSyncs}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Taxa de Sucesso
+                Taxa de Sucesso Sync
               </CardTitle>
               <TrendingUp className="h-4 w-4 text-success" />
             </CardHeader>
@@ -414,12 +496,56 @@ const AdminDashboard = () => {
               <div className="text-2xl font-bold text-foreground">
                 {stats.totalSyncs > 0
                   ? Math.round((stats.successfulSyncs / stats.totalSyncs) * 100)
-                  : 0}
-                %
+                  : 0}%
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* User Registration Chart */}
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-foreground flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              Cadastros nos Últimos 30 Dias
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={registrationData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={10}
+                    interval={4}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={12}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    labelStyle={{ color: "hsl(var(--foreground))" }}
+                    formatter={(value: number) => [value, "Novos usuários"]}
+                  />
+                  <Bar 
+                    dataKey="count" 
+                    fill="hsl(var(--primary))" 
+                    radius={[4, 4, 0, 0]}
+                    name="Cadastros"
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Evolution by Round Chart */}
         {pontuacoesRodada.length > 0 && (
