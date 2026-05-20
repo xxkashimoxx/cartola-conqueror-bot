@@ -221,6 +221,45 @@ Deno.serve(async (req) => {
 
     console.log(`Total de ${pontuacoesTotal} pontuações sincronizadas`);
 
+    // 6. Sincronizar partidas (confrontos) de todas as rodadas
+    console.log('Sincronizando partidas/confrontos...');
+    let partidasTotal = 0;
+    for (let rodada = 1; rodada <= 38; rodada++) {
+      try {
+        const partidasResponse = await fetch(`https://api.cartolafc.globo.com/partidas/${rodada}`);
+        if (!partidasResponse.ok) {
+          console.log(`Partidas rodada ${rodada} indisponíveis (${partidasResponse.status})`);
+          continue;
+        }
+        const partidasData = await partidasResponse.json();
+        const partidas: any[] = partidasData.partidas || [];
+        if (partidas.length === 0) continue;
+
+        // Limpar partidas existentes desta rodada para evitar duplicação
+        await supabase.from('partidas').delete().eq('rodada', rodada);
+
+        const partidasFormatadas = partidas.map((p: any) => ({
+          rodada,
+          time_casa_id: p.clube_casa_id,
+          time_fora_id: p.clube_visitante_id,
+          data_partida: p.partida_data ? new Date(p.partida_data.replace(' ', 'T') + '-03:00').toISOString() : null,
+        }));
+
+        const { error: partidasError } = await supabase.from('partidas').insert(partidasFormatadas);
+        if (partidasError) {
+          console.error(`Erro ao salvar partidas rodada ${rodada}:`, partidasError);
+        } else {
+          partidasTotal += partidasFormatadas.length;
+          console.log(`Rodada ${rodada}: ${partidasFormatadas.length} partidas salvas`);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch (error) {
+        console.error(`Erro ao processar partidas rodada ${rodada}:`, error);
+      }
+    }
+    console.log(`Total de ${partidasTotal} partidas sincronizadas`);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -229,12 +268,14 @@ Deno.serve(async (req) => {
         clubes: clubes.length,
         atletas: atletas.length,
         pontuacoes: pontuacoesTotal,
+        partidas: partidasTotal,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     );
+
   } catch (error) {
     console.error('Erro na sincronização:', error);
     const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
