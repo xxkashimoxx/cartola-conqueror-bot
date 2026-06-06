@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Compare from "./pages/Compare";
 import TeamBuilder from "./pages/TeamBuilder";
+import HistoricoEscalacoes from "./pages/HistoricoEscalacoes";
 import Confrontos from "./pages/Confrontos";
 import RadarAusencias from "./pages/RadarAusencias";
 import Simulador from "./pages/Simulador";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/compare" element={<Compare />} />
             <Route path="/team-builder" element={<TeamBuilder />} />
+            <Route path="/historico" element={<HistoricoEscalacoes />} />
             <Route path="/confrontos" element={<Confrontos />} />
             <Route path="/ausencias" element={<RadarAusencias />} />
             <Route path="/simulador" element={<Simulador />} />
