@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle, BarChart3, LineChart, Sparkles, Shield } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import ResumoRodada from "@/components/ResumoRodada";
 
 interface Player {
   id: number;
@@ -241,7 +242,12 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-8 space-y-8">
+        {user && (
+          <ResumoRodada />
+        )}
+
         <div className="mb-8">
           <h2 className="text-neon-red font-black text-2xl md:text-3xl mb-2">
             TOP ATLETAS DO CARTOLA
