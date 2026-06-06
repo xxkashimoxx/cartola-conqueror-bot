@@ -77,8 +77,8 @@ Deno.serve(async (req) => {
       .eq('status_id', 7)
       .gte('jogos', 3)
       .order('media', { ascending: false })
-      .limit: 60 as any
       .limit(60);
+
 
     const posMap: Record<number, string> = { 1: 'GOL', 2: 'LAT', 3: 'ZAG', 4: 'MEI', 5: 'ATA', 6: 'TEC' };
     const atletas = (topAtletas || []).map((a: any) => ({
