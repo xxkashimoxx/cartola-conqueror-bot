@@ -180,6 +180,45 @@ export type Database = {
         }
         Relationships: []
       }
+      escalacoes_usuario: {
+        Row: {
+          atleta_ids: number[]
+          created_at: string
+          estrategia: string | null
+          id: string
+          pontos_esperados: number
+          rodada: number
+          tipo: string
+          updated_at: string
+          user_id: string
+          valor_total: number
+        }
+        Insert: {
+          atleta_ids?: number[]
+          created_at?: string
+          estrategia?: string | null
+          id?: string
+          pontos_esperados?: number
+          rodada: number
+          tipo: string
+          updated_at?: string
+          user_id: string
+          valor_total?: number
+        }
+        Update: {
+          atleta_ids?: number[]
+          created_at?: string
+          estrategia?: string | null
+          id?: string
+          pontos_esperados?: number
+          rodada?: number
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          valor_total?: number
+        }
+        Relationships: []
+      }
       mercado_status: {
         Row: {
           abertura: string | null
