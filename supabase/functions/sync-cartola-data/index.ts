@@ -55,6 +55,19 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Permite forçar reprocessamento de todas as rodadas ou de uma lista específica
+    let force = false;
+    let rodadasForce: number[] = [];
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json();
+        force = !!body?.force;
+        if (Array.isArray(body?.rodadas)) {
+          rodadasForce = body.rodadas.filter((r: any) => Number.isInteger(r));
+        }
+      } catch { /* sem body */ }
+    }
+
     console.log('Iniciando sincronização com API do Cartola FC...');
 
     // 1. Buscar status do mercado
