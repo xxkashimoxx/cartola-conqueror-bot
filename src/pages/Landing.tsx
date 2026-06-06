@@ -15,6 +15,27 @@ interface NewsItem {
 
 const Landing = () => {
   const navigate = useNavigate();
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loadingNews, setLoadingNews] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke('news-brasileirao');
+        if (data?.news) setNews(data.news.slice(0, 9));
+      } catch (e) {
+        console.error('Erro ao carregar notícias', e);
+      } finally {
+        setLoadingNews(false);
+      }
+    })();
+  }, []);
+
+  const formatDate = (s: string) => {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="min-h-screen bg-background">
