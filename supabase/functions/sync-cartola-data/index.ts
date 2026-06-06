@@ -55,6 +55,19 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // Permite forçar reprocessamento de todas as rodadas ou de uma lista específica
+    let force = false;
+    let rodadasForce: number[] = [];
+    if (req.method === 'POST') {
+      try {
+        const body = await req.json();
+        force = !!body?.force;
+        if (Array.isArray(body?.rodadas)) {
+          rodadasForce = body.rodadas.filter((r: any) => Number.isInteger(r));
+        }
+      } catch { /* sem body */ }
+    }
+
     console.log('Iniciando sincronização com API do Cartola FC...');
 
     // 1. Buscar status do mercado
@@ -154,32 +167,47 @@ Deno.serve(async (req) => {
       console.log(`Total de ${atletasFormatados.length} atletas processados`);
     }
 
-    // 5. Sincronizar pontuações por rodada
+    // 5. Sincronizar pontuações por rodada (com upsert para garantir assertividade)
     console.log('Sincronizando pontuações por rodada...');
     let pontuacoesTotal = 0;
+    let rodadasAtualizadas = 0;
     const rodadaAtual = mercadoData.rodada_atual;
     const pontuacaoBatchSize = 500;
 
-    // Verificar quais rodadas já foram sincronizadas
-    const { data: rodadasSincronizadas } = await supabase
+    // Conta quantas pontuações já existem por rodada (para detectar rodadas incompletas)
+    const { data: contagemRodadas } = await supabase
       .from('atleta_pontuacoes')
       .select('rodada')
-      .order('rodada', { ascending: false });
+      .order('rodada', { ascending: true });
 
-    const rodadasExistentes = new Set(rodadasSincronizadas?.map(r => r.rodada) || []);
-    console.log(`Rodadas já sincronizadas: ${Array.from(rodadasExistentes).join(', ') || 'nenhuma'}`);
+    const contagemPorRodada = new Map<number, number>();
+    (contagemRodadas || []).forEach((r: any) => {
+      contagemPorRodada.set(r.rodada, (contagemPorRodada.get(r.rodada) || 0) + 1);
+    });
+    console.log('Contagem atual por rodada:', JSON.stringify(Array.from(contagemPorRodada.entries())));
 
-    // Sincronizar rodadas passadas (de 1 até rodada atual - 1)
-    for (let rodada = 1; rodada < rodadaAtual; rodada++) {
-      if (rodadasExistentes.has(rodada)) {
-        console.log(`Rodada ${rodada} já sincronizada, pulando...`);
-        continue;
+    // Determinar quais rodadas processar
+    // - Sempre reprocessa a rodada anterior à atual (pode ter scout/pontuação corrigida)
+    // - Reprocessa rodadas com menos de 250 pontuações registradas (provavelmente incompletas)
+    // - Se force=true, reprocessa todas as rodadas 1..rodadaAtual-1
+    // - Se rodadasForce for passada, reprocessa exatamente essas
+    const rodadasParaProcessar: number[] = [];
+    for (let r = 1; r < rodadaAtual; r++) {
+      const count = contagemPorRodada.get(r) || 0;
+      const incompleta = count < 250; // Série A costuma ter ~600+ pontuações por rodada
+      const ultimaRodada = r === rodadaAtual - 1;
+      const forcada = force || rodadasForce.includes(r);
+      if (!contagemPorRodada.has(r) || incompleta || ultimaRodada || forcada) {
+        rodadasParaProcessar.push(r);
       }
+    }
+    console.log(`Rodadas a processar/atualizar: ${rodadasParaProcessar.join(', ') || 'nenhuma'}`);
 
+    for (const rodada of rodadasParaProcessar) {
       try {
         console.log(`Buscando pontuações da rodada ${rodada}...`);
         const pontuadosResponse = await fetch(`https://api.cartolafc.globo.com/atletas/pontuados/${rodada}`);
-        
+
         if (!pontuadosResponse.ok) {
           console.log(`Rodada ${rodada} não disponível (status ${pontuadosResponse.status})`);
           continue;
@@ -189,37 +217,40 @@ Deno.serve(async (req) => {
         const atletasPontuados: CartolaAtletaPontuado[] = Object.values(pontuadosData.atletas || {});
 
         if (atletasPontuados.length > 0) {
-          const pontuacoesFormatadas = atletasPontuados.map(atleta => ({
-            atleta_id: atleta.atleta_id,
-            rodada: rodada,
-            pontos: atleta.pontuacao,
-            preco: atleta.preco_num || null,
-          }));
+          const pontuacoesFormatadas = atletasPontuados
+            .filter(a => a.atleta_id != null && a.pontuacao != null)
+            .map(atleta => ({
+              atleta_id: atleta.atleta_id,
+              rodada: rodada,
+              pontos: Number(atleta.pontuacao) || 0,
+              preco: atleta.preco_num ?? null,
+            }));
 
-          // Inserir em lotes de 500
+          // Upsert garante que pontuações corrigidas sobrescrevam valores antigos
           for (let i = 0; i < pontuacoesFormatadas.length; i += pontuacaoBatchSize) {
             const batch = pontuacoesFormatadas.slice(i, i + pontuacaoBatchSize);
             const { error: pontuacoesError } = await supabase
               .from('atleta_pontuacoes')
-              .insert(batch);
+              .upsert(batch, { onConflict: 'atleta_id,rodada' });
 
             if (pontuacoesError) {
               console.error(`Erro ao salvar pontuações rodada ${rodada}:`, pontuacoesError);
             }
           }
 
-          pontuacoesTotal += atletasPontuados.length;
-          console.log(`Rodada ${rodada}: ${atletasPontuados.length} pontuações salvas`);
+          pontuacoesTotal += pontuacoesFormatadas.length;
+          rodadasAtualizadas++;
+          console.log(`Rodada ${rodada}: ${pontuacoesFormatadas.length} pontuações atualizadas (upsert)`);
         }
 
-        // Rate limiting - aguardar 500ms entre requisições
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 250));
       } catch (error) {
         console.error(`Erro ao processar rodada ${rodada}:`, error);
       }
     }
 
-    console.log(`Total de ${pontuacoesTotal} pontuações sincronizadas`);
+    console.log(`Total de ${pontuacoesTotal} pontuações sincronizadas em ${rodadasAtualizadas} rodadas`);
+
 
     // 6. Sincronizar partidas (confrontos) de todas as rodadas
     console.log('Sincronizando partidas/confrontos...');

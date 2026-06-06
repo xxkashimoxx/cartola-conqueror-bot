@@ -1,9 +1,41 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Target, TrendingUp, Zap, Shield } from "lucide-react";
+import { Target, TrendingUp, Zap, Shield, Newspaper, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+interface NewsItem {
+  title: string;
+  link: string;
+  description: string;
+  pubDate: string;
+  image: string | null;
+  source: string;
+}
 
 const Landing = () => {
   const navigate = useNavigate();
+  const [news, setNews] = useState<NewsItem[]>([]);
+  const [loadingNews, setLoadingNews] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.functions.invoke('news-brasileirao');
+        if (data?.news) setNews(data.news.slice(0, 9));
+      } catch (e) {
+        console.error('Erro ao carregar notícias', e);
+      } finally {
+        setLoadingNews(false);
+      }
+    })();
+  }, []);
+
+  const formatDate = (s: string) => {
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -71,6 +103,78 @@ const Landing = () => {
           />
         </div>
       </div>
+
+      {/* News Section */}
+      <div className="container mx-auto px-4 py-16">
+        <div className="flex items-center gap-3 mb-8">
+          <Newspaper className="h-8 w-8 text-neon-cyan" />
+          <h2 className="text-neon-cyan font-black uppercase text-3xl md:text-4xl tracking-wider">
+            Tá Rolando no Brasileirão
+          </h2>
+        </div>
+        <p className="text-muted-foreground text-lg mb-8">
+          As notícias quentes das partidas. Fica ligado pra não perder mitada.
+        </p>
+
+        {loadingNews ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-card border border-border rounded-lg h-72 animate-pulse" />
+            ))}
+          </div>
+        ) : news.length === 0 ? (
+          <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground">
+            Nenhuma notícia disponível no momento.
+          </div>
+        ) : (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {news.map((n, i) => (
+              <a
+                key={i}
+                href={n.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-card border-2 border-border rounded-lg overflow-hidden hover:border-primary hover:shadow-neon transition-all duration-300 flex flex-col"
+              >
+                {n.image ? (
+                  <div className="aspect-video w-full overflow-hidden bg-secondary">
+                    <img
+                      src={n.image}
+                      alt={n.title}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-video w-full bg-gradient-to-br from-primary/20 to-secondary flex items-center justify-center">
+                    <Newspaper className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                )}
+                <div className="p-5 flex-1 flex flex-col">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
+                    <span className="bg-primary/10 text-neon-cyan px-2 py-1 rounded font-bold uppercase">
+                      {n.source}
+                    </span>
+                    <span>{formatDate(n.pubDate)}</span>
+                  </div>
+                  <h3 className="font-bold text-foreground text-base leading-snug mb-2 group-hover:text-neon-cyan transition-colors">
+                    {n.title}
+                  </h3>
+                  {n.description && (
+                    <p className="text-muted-foreground text-sm line-clamp-3 flex-1">
+                      {n.description}
+                    </p>
+                  )}
+                  <div className="mt-3 flex items-center gap-1 text-xs text-neon-cyan font-bold uppercase">
+                    Ler matéria <ExternalLink className="h-3 w-3" />
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+
 
       {/* CTA Section */}
       <div className="container mx-auto px-4 py-20">
