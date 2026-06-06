@@ -245,6 +245,9 @@ const TeamBuilder = () => {
             {rodada > 0 && <Badge variant="outline" className="text-xs">Rodada {rodada}</Badge>}
           </div>
           <div className="flex gap-2">
+            <Button onClick={() => navigate("/historico")} variant="outline" className="border-border">
+              <GitCompare className="mr-2 h-4 w-4" /> Histórico
+            </Button>
             <Button onClick={handleReset} variant="outline" className="border-border">
               <ArrowRightLeft className="mr-2 h-4 w-4" /> Resetar
             </Button>
