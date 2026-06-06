@@ -13,8 +13,8 @@ interface NewsItem {
 }
 
 const FEEDS = [
-  { url: 'https://ge.globo.com/futebol/brasileirao-serie-a/rss2.xml', source: 'ge.globo' },
-  { url: 'https://www.cnnbrasil.com.br/esportes/feed/', source: 'CNN Brasil' },
+  { url: 'https://pox.globo.com/rss/ge/futebol', source: 'GE' },
+  { url: 'https://pox.globo.com/rss/g1/futebol/brasileirao-serie-a', source: 'g1' },
 ];
 
 function decodeEntities(s: string) {
