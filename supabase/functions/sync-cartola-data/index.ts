@@ -167,19 +167,6 @@ Deno.serve(async (req) => {
       console.log(`Total de ${atletasFormatados.length} atletas processados`);
     }
 
-    // 5. Sincronizar pontuações por rodada
-    console.log('Sincronizando pontuações por rodada...');
-    let pontuacoesTotal = 0;
-    const rodadaAtual = mercadoData.rodada_atual;
-    const pontuacaoBatchSize = 500;
-
-    // Verificar quais rodadas já foram sincronizadas
-    const { data: rodadasSincronizadas } = await supabase
-      .from('atleta_pontuacoes')
-      .select('rodada')
-      .order('rodada', { ascending: false });
-
-    const rodadasExistentes = new Set(rodadasSincronizadas?.map(r => r.rodada) || []);
     // 5. Sincronizar pontuações por rodada (com upsert para garantir assertividade)
     console.log('Sincronizando pontuações por rodada...');
     let pontuacoesTotal = 0;
