@@ -50,7 +50,7 @@ function extractImage(itemXml: string, description: string): string | null {
 }
 
 function stripHtml(s: string) {
-  return decodeEntities(s.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
+  return decodeEntities(s.replace(/<!\[CDATA\[/g, '').replace(/\]\]>/g, '').replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
 }
 
 async function fetchFeed(url: string, source: string): Promise<NewsItem[]> {
