@@ -1,6 +1,17 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Target, TrendingUp, Zap, Shield } from "lucide-react";
+import { Target, TrendingUp, Zap, Shield, Newspaper, ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+
+interface NewsItem {
+  title: string;
+  link: string;
+  description: string;
+  pubDate: string;
+  image: string | null;
+  source: string;
+}
 
 const Landing = () => {
   const navigate = useNavigate();
