@@ -174,6 +174,11 @@ const NewsCards = ({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {stale && (
+            <span className="text-xs bg-warning/20 text-warning border border-warning/40 px-2 py-0.5 rounded font-bold uppercase" title="Fontes indisponíveis — exibindo última versão em cache">
+              Cache
+            </span>
+          )}
           {lastUpdate && (
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Atualizado {formatRelative(lastUpdate)}
