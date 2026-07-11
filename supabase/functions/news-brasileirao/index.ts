@@ -60,9 +60,12 @@ function stripHtml(s: string) {
 }
 
 async function fetchFeed(url: string, source: string): Promise<NewsItem[]> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), FEED_TIMEOUT_MS);
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 PrecisaoBot/1.0' },
+      signal: ctl.signal,
     });
     if (!res.ok) {
       console.log(`Falha ao buscar ${source}: ${res.status}`);
@@ -82,8 +85,51 @@ async function fetchFeed(url: string, source: string): Promise<NewsItem[]> {
       };
     });
   } catch (e) {
-    console.error(`Erro feed ${source}:`, e);
+    console.error(`Erro feed ${source}:`, (e as Error)?.message ?? e);
     return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function getSupabase() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+}
+
+async function readCache(): Promise<{ news: NewsItem[]; fetched_at: string } | null> {
+  try {
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('news_cache')
+      .select('payload, fetched_at')
+      .eq('cache_key', CACHE_KEY)
+      .maybeSingle();
+    if (!data) return null;
+    const payload = data.payload as any;
+    return { news: payload?.news ?? [], fetched_at: data.fetched_at as string };
+  } catch (e) {
+    console.error('readCache erro:', (e as Error)?.message ?? e);
+    return null;
+  }
+}
+
+async function writeCache(news: NewsItem[], sourceOk: boolean) {
+  try {
+    const supabase = getSupabase();
+    await supabase.from('news_cache').upsert(
+      {
+        cache_key: CACHE_KEY,
+        payload: { news },
+        fetched_at: new Date().toISOString(),
+        source_ok: sourceOk,
+      },
+      { onConflict: 'cache_key' },
+    );
+  } catch (e) {
+    console.error('writeCache erro:', (e as Error)?.message ?? e);
   }
 }
 
@@ -92,26 +138,66 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const url = new URL(req.url);
+  const forceRefresh = url.searchParams.get('refresh') === '1';
+
+  // 1) TTL: se cache está fresco e não é refresh forçado, devolve direto
+  if (!forceRefresh) {
+    const cached = await readCache();
+    if (cached && Date.now() - new Date(cached.fetched_at).getTime() < CACHE_TTL_MS) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          news: cached.news,
+          cached: true,
+          fetched_at: cached.fetched_at,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+      );
+    }
+  }
+
+  // 2) Busca ao vivo com timeout por feed
+  let all: NewsItem[] = [];
+  let feedError: string | null = null;
   try {
     const results = await Promise.all(FEEDS.map((f) => fetchFeed(f.url, f.source)));
-    const all = results.flat();
-
-    // ordenar por data desc
-    all.sort((a, b) => {
-      const da = new Date(a.pubDate).getTime() || 0;
-      const db = new Date(b.pubDate).getTime() || 0;
-      return db - da;
-    });
-
-    return new Response(
-      JSON.stringify({ success: true, news: all.slice(0, 12) }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
+    all = results.flat();
   } catch (error) {
-    const msg = error instanceof Error ? error.message : 'Erro desconhecido';
+    feedError = error instanceof Error ? error.message : 'Erro desconhecido';
+  }
+
+  all.sort((a, b) => (new Date(b.pubDate).getTime() || 0) - (new Date(a.pubDate).getTime() || 0));
+  const fresh = all.slice(0, 12);
+
+  // 3) Se nada veio → fallback para o cache (mesmo expirado)
+  if (fresh.length === 0) {
+    const cached = await readCache();
+    if (cached && cached.news.length > 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          news: cached.news,
+          cached: true,
+          stale: true,
+          fetched_at: cached.fetched_at,
+          fallback_reason: feedError ?? 'feeds_vazios',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+      );
+    }
+    // Sem cache e sem feed → 200 com lista vazia (evita quebrar UI)
     return new Response(
-      JSON.stringify({ success: false, error: msg, news: [] }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ success: false, news: [], error: feedError ?? 'sem_dados' }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
     );
   }
+
+  // 4) Sucesso: atualiza cache em background e devolve
+  writeCache(fresh, true); // fire-and-forget
+  return new Response(
+    JSON.stringify({ success: true, news: fresh, cached: false, fetched_at: new Date().toISOString() }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 },
+  );
 });
+
