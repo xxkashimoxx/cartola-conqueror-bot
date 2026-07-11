@@ -246,6 +246,9 @@ const Dashboard = () => {
           <ResumoRodada />
         )}
 
+        <NewsCards limit={6} />
+
+
         <div className="mb-8">
           <h2 className="text-neon-red font-black text-2xl md:text-3xl mb-2">
             TOP ATLETAS DO CARTOLA
