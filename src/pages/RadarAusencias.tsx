@@ -66,7 +66,7 @@ const RadarAusencias = () => {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate("/auth");
+      /* auth desativado */
     }
   }, [user, authLoading, navigate]);
 
