@@ -43,10 +43,11 @@ const NewsCards = ({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const [stale, setStale] = useState(false);
   const inFlightRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+  const load = async ({ silent = false, force = false }: { silent?: boolean; force?: boolean } = {}) => {
     // Evita chamadas concorrentes (aba volta ao foco durante refresh, por ex.)
     if (inFlightRef.current) return;
     inFlightRef.current = true;
@@ -57,8 +58,20 @@ const NewsCards = ({
     if (!silent) setRefreshing(true);
 
     try {
-      // functions.invoke não expõe signal — usamos race para não travar a UI
-      const invocation = supabase.functions.invoke("news-brasileirao");
+      // Refresh manual força bypass do TTL (?refresh=1 no edge function)
+      const invocation = force
+        ? fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/news-brasileirao?refresh=1`,
+            {
+              method: "POST",
+              headers: {
+                apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+            },
+          ).then((r) => r.json()).then((d) => ({ data: d, error: null }))
+        : supabase.functions.invoke("news-brasileirao");
+
       const aborted = new Promise<never>((_, reject) => {
         controller.signal.addEventListener("abort", () => reject(new Error("aborted")));
       });
@@ -67,6 +80,7 @@ const NewsCards = ({
       if (data?.news) {
         setNews(data.news.slice(0, limit));
         setLastUpdate(Date.now());
+        setStale(!!data.stale);
       }
     } catch (e) {
       if ((e as Error)?.message !== "aborted") {
@@ -129,7 +143,8 @@ const NewsCards = ({
   }, [refreshMinutes, limit]);
 
   const handleRefresh = () => {
-    load({ silent: false });
+    // Clique manual força bypass do cache no backend
+    load({ silent: false, force: true });
   };
 
   const formatRelative = (ts: number) => {
@@ -159,6 +174,11 @@ const NewsCards = ({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {stale && (
+            <span className="text-xs bg-warning/20 text-warning border border-warning/40 px-2 py-0.5 rounded font-bold uppercase" title="Fontes indisponíveis — exibindo última versão em cache">
+              Cache
+            </span>
+          )}
           {lastUpdate && (
             <span className="text-xs text-muted-foreground hidden sm:inline">
               Atualizado {formatRelative(lastUpdate)}
