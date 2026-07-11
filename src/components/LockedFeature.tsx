@@ -25,8 +25,9 @@ const planLabels: Record<Plan, string> = {
   MASTER: 'Master',
 };
 
-export const canAccess = (currentPlan: Plan, requiredPlan: Plan): boolean => {
-  return planOrder[currentPlan] >= planOrder[requiredPlan];
+export const canAccess = (_currentPlan: Plan, _requiredPlan: Plan): boolean => {
+  // Planos desativados temporariamente — todos os recursos liberados.
+  return true;
 };
 
 const LockedFeature = ({ feature, currentPlan, requiredPlan, children }: LockedFeatureProps) => {
