@@ -59,7 +59,7 @@ const Landing = () => {
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-8">
               <Button 
                 size="lg"
-                onClick={() => navigate("/auth")}
+                onClick={() => navigate("/dashboard")}
                 className="bg-primary hover:bg-primary/80 text-primary-foreground text-lg font-bold px-8 py-6 shadow-neon border-2 border-primary"
               >
                 <Zap className="mr-2 h-5 w-5" />
@@ -187,7 +187,7 @@ const Landing = () => {
           </p>
           <Button 
             size="lg"
-            onClick={() => navigate("/auth")}
+            onClick={() => navigate("/dashboard")}
             className="bg-destructive hover:bg-destructive/80 text-destructive-foreground text-lg font-bold px-12 py-6 shadow-danger border-2 border-destructive"
           >
             <Target className="mr-2 h-5 w-5" />

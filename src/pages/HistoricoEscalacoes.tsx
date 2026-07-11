@@ -55,7 +55,7 @@ const HistoricoEscalacoes = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate("/auth");
+      /* auth desativado */
       return;
     }
     (async () => {

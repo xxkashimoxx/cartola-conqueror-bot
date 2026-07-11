@@ -48,7 +48,7 @@ const Dashboard = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (!session) {
-        navigate("/auth");
+        /* auth desativado */
       }
     });
 
@@ -57,7 +57,7 @@ const Dashboard = () => {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (!session) {
-        navigate("/auth");
+        /* auth desativado */
       }
     });
 
@@ -131,7 +131,7 @@ const Dashboard = () => {
       title: "Até a próxima!",
       description: "Você saiu da conta com sucesso",
     });
-    navigate("/auth");
+    /* auth desativado */
   };
 
   if (loading) {

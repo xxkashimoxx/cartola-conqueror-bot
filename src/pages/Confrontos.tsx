@@ -67,7 +67,7 @@ const Confrontos = () => {
 
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate("/auth");
+      /* auth desativado */
     }
   }, [user, authLoading, navigate]);
 
