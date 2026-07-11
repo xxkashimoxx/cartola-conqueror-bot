@@ -155,15 +155,11 @@ const Dashboard = () => {
               Precisão &gt; Clubismo
             </h1>
             <div className="flex gap-2 flex-wrap justify-center">
-              <Button
-                onClick={syncCartolaData}
-                disabled={syncing}
-                variant="outline"
+              <SyncNowButton
                 className="border-2 border-neon-cyan hover:bg-card"
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Sincronizando...' : 'Atualizar Dados'}
-              </Button>
+                label="Sincronizar agora"
+                onDone={fetchPlayers}
+              />
               <Button
                 onClick={() => navigate("/confrontos")}
                 variant="outline"
