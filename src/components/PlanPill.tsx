@@ -30,18 +30,9 @@ const planConfig: Record<Plan, { bg: string; text: string; label: string }> = {
   },
 };
 
-const PlanPill = ({ plan, className }: PlanPillProps) => {
-  const { bg, text, label } = planConfig[plan];
-
-  return (
-    <span className={cn(
-      'px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider',
-      bg, text,
-      className
-    )}>
-      {label}
-    </span>
-  );
+const PlanPill = (_props: PlanPillProps) => {
+  // Planos desativados temporariamente.
+  return null;
 };
 
 export default PlanPill;
