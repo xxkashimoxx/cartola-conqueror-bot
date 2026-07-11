@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import AdminLayout from "@/components/admin/AdminLayout";
+import SyncNowButton from "@/components/SyncNowButton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { 
-  RefreshCw, 
-  Database, 
-  Users, 
+import {
+  RefreshCw,
+  Database,
+  Users,
   CheckCircle,
   AlertCircle
 } from "lucide-react";
