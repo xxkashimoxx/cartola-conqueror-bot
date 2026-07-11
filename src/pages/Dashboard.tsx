@@ -324,6 +324,9 @@ const Dashboard = () => {
                     </div>
 
                     <div className="space-y-3">
+                      {/* Pontuação AO VIVO */}
+                      <LivePointsBadge live={liveScores.get(player.id)} fallback={0} />
+
                       {/* Score de Potencial */}
                       <Tooltip>
                         <TooltipTrigger asChild>
