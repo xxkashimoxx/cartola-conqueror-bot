@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
+import { Newspaper, ExternalLink, RefreshCw, Search, X, Users, Shield, CalendarClock, Globe2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface NewsItem {
   title: string;
@@ -44,6 +45,10 @@ const NewsCards = ({
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
   const [stale, setStale] = useState(false);
+  const [filter, setFilter] = useState<"all" | "jogadores" | "times" | "proximos">("all");
+  const [query, setQuery] = useState("");
+  const [clubeNames, setClubeNames] = useState<string[]>([]);
+  const [atletaNames, setAtletaNames] = useState<string[]>([]);
   const inFlightRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -78,7 +83,8 @@ const NewsCards = ({
       const { data } = (await Promise.race([invocation, aborted])) as any;
       if (controller.signal.aborted) return;
       if (data?.news) {
-        setNews(data.news.slice(0, limit));
+        // guardamos todo o pool para filtros; o `limit` só corta na renderização
+        setNews(data.news);
         setLastUpdate(Date.now());
         setStale(!!data.stale);
       }
@@ -154,10 +160,92 @@ const NewsCards = ({
     return `há ${Math.floor(diff / 3600)}h`;
   };
 
+  // Dicionário de clubes/atletas para categorizar notícias
+  useEffect(() => {
+    (async () => {
+      const [clubesRes, atletasRes] = await Promise.all([
+        supabase.from("clubes").select("nome, abreviacao"),
+        supabase.from("atletas").select("apelido").order("media", { ascending: false }).limit(250),
+      ]);
+      const clubes = (clubesRes.data || [])
+        .flatMap((c: any) => [c.nome, c.abreviacao])
+        .filter((v: string) => v && v.length >= 3);
+      const atletas = (atletasRes.data || [])
+        .map((a: any) => a.apelido)
+        .filter((v: string) => v && v.length >= 3);
+      setClubeNames(Array.from(new Set(clubes)));
+      setAtletaNames(Array.from(new Set(atletas)));
+    })();
+  }, []);
+
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  // Palavras que indicam "próximo jogo / preview"
+  const PROXIMOS_KEYWORDS = useMemo(
+    () => [
+      "provavel", "escalacao", "escalado", "escala", "escalará",
+      "vai enfrentar", "encara", "recebe", "visita",
+      "duelo", "confronto", "classico",
+      "proximo jogo", "proxima rodada", "antes do jogo", "pre-jogo",
+      "onde assistir", "que horas", "escala time",
+    ],
+    []
+  );
+
+  const categorize = (n: NewsItem) => {
+    const text = normalize(`${n.title} ${n.description}`);
+    const hasClube = clubeNames.some((c) => text.includes(normalize(c)));
+    const hasAtleta = atletaNames.some((a) => text.includes(normalize(a)));
+    const isProximo = PROXIMOS_KEYWORDS.some((k) => text.includes(k));
+    return { hasClube, hasAtleta, isProximo };
+  };
+
+  const filteredNews = useMemo(() => {
+    const q = normalize(query.trim());
+    return news.filter((n) => {
+      // busca livre
+      if (q) {
+        const text = normalize(`${n.title} ${n.description}`);
+        if (!text.includes(q)) return false;
+      }
+      if (filter === "all") return true;
+      const { hasClube, hasAtleta, isProximo } = categorize(n);
+      if (filter === "jogadores") return hasAtleta;
+      if (filter === "times") return hasClube;
+      if (filter === "proximos") return isProximo || (hasClube && /\d{1,2}[hx:]\d{2}|hoje|amanha|domingo|sabado|sexta|quinta|quarta/i.test(normalize(n.title + " " + n.description)));
+      return true;
+    });
+  }, [news, filter, query, clubeNames, atletaNames, PROXIMOS_KEYWORDS]);
+
+  const counts = useMemo(() => {
+    const c = { all: news.length, jogadores: 0, times: 0, proximos: 0 };
+    for (const n of news) {
+      const { hasClube, hasAtleta, isProximo } = categorize(n);
+      if (hasAtleta) c.jogadores++;
+      if (hasClube) c.times++;
+      if (isProximo || hasClube) {
+        if (isProximo) c.proximos++;
+      }
+    }
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [news, clubeNames, atletaNames]);
+
+  const FILTERS: { key: typeof filter; label: string; icon: any; count: number }[] = [
+    { key: "all",       label: "Tudo",           icon: Globe2,        count: counts.all },
+    { key: "jogadores", label: "Jogadores",      icon: Users,         count: counts.jogadores },
+    { key: "times",     label: "Times",          icon: Shield,        count: counts.times },
+    { key: "proximos",  label: "Próximos jogos", icon: CalendarClock, count: counts.proximos },
+  ];
 
   const gridClass = compact
     ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
     : "grid md:grid-cols-2 lg:grid-cols-3 gap-6";
+
 
   return (
     <section className="w-full">
@@ -197,6 +285,50 @@ const NewsCards = ({
         </div>
       </div>
 
+      {/* Barra de filtros + busca */}
+      <div className="flex flex-col md:flex-row gap-3 mb-5">
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map(({ key, label, icon: Icon, count }) => {
+            const active = filter === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                  active
+                    ? "bg-neon-cyan/20 border-neon-cyan text-neon-cyan shadow-neon"
+                    : "bg-card border-border text-muted-foreground hover:border-neon-cyan/50 hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+                <span className={`ml-1 text-[10px] font-mono ${active ? "text-neon-cyan" : "text-muted-foreground"}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="relative flex-1 min-w-[180px] md:max-w-sm md:ml-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por jogador, time, palavra..."
+            className="pl-9 pr-9 bg-card border-border"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-secondary text-muted-foreground"
+              aria-label="Limpar busca"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {loading ? (
         <div className={gridClass}>
           {[...Array(limit)].map((_, i) => (
@@ -206,13 +338,15 @@ const NewsCards = ({
             />
           ))}
         </div>
-      ) : news.length === 0 ? (
+      ) : filteredNews.length === 0 ? (
         <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground">
-          Nenhuma notícia disponível no momento.
+          {news.length === 0
+            ? "Nenhuma notícia disponível no momento."
+            : "Nenhuma notícia bate com esses filtros. Tenta limpar a busca ou trocar a categoria."}
         </div>
       ) : (
         <div className={gridClass}>
-          {news.map((n, i) => (
+          {filteredNews.slice(0, limit).map((n, i) => (
             <a
               key={i}
               href={n.link}
