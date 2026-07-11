@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import ResumoRodada from "@/components/ResumoRodada";
 import SyncNowButton from "@/components/SyncNowButton";
 import NewsCards from "@/components/NewsCards";
+import LivePointsBadge from "@/components/LivePointsBadge";
+import { useLiveScores } from "@/hooks/useLiveScores";
 
 interface Player {
   id: number;
