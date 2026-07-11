@@ -284,6 +284,50 @@ const NewsCards = ({
         </div>
       </div>
 
+      {/* Barra de filtros + busca */}
+      <div className="flex flex-col md:flex-row gap-3 mb-5">
+        <div className="flex flex-wrap gap-2">
+          {FILTERS.map(({ key, label, icon: Icon, count }) => {
+            const active = filter === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border-2 text-xs font-bold uppercase tracking-wider transition-all ${
+                  active
+                    ? "bg-neon-cyan/20 border-neon-cyan text-neon-cyan shadow-neon"
+                    : "bg-card border-border text-muted-foreground hover:border-neon-cyan/50 hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {label}
+                <span className={`ml-1 text-[10px] font-mono ${active ? "text-neon-cyan" : "text-muted-foreground"}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="relative flex-1 min-w-[180px] md:max-w-sm md:ml-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por jogador, time, palavra..."
+            className="pl-9 pr-9 bg-card border-border"
+          />
+          {query && (
+            <button
+              onClick={() => setQuery("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-secondary text-muted-foreground"
+              aria-label="Limpar busca"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {loading ? (
         <div className={gridClass}>
           {[...Array(limit)].map((_, i) => (
@@ -293,13 +337,15 @@ const NewsCards = ({
             />
           ))}
         </div>
-      ) : news.length === 0 ? (
+      ) : filteredNews.length === 0 ? (
         <div className="bg-card border border-border rounded-lg p-8 text-center text-muted-foreground">
-          Nenhuma notícia disponível no momento.
+          {news.length === 0
+            ? "Nenhuma notícia disponível no momento."
+            : "Nenhuma notícia bate com esses filtros. Tenta limpar a busca ou trocar a categoria."}
         </div>
       ) : (
         <div className={gridClass}>
-          {news.map((n, i) => (
+          {filteredNews.slice(0, limit).map((n, i) => (
             <a
               key={i}
               href={n.link}
