@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Acti
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ResumoRodada from "@/components/ResumoRodada";
 import SyncNowButton from "@/components/SyncNowButton";
+import NewsCards from "@/components/NewsCards";
 
 interface Player {
   id: number;
