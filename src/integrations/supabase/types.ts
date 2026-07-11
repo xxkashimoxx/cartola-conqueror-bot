@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      atleta_parciais: {
+        Row: {
+          atleta_id: number
+          atualizado_em: string
+          jogou: boolean
+          pontos: number
+          rodada: number
+          scout: Json | null
+        }
+        Insert: {
+          atleta_id: number
+          atualizado_em?: string
+          jogou?: boolean
+          pontos?: number
+          rodada: number
+          scout?: Json | null
+        }
+        Update: {
+          atleta_id?: number
+          atualizado_em?: string
+          jogou?: boolean
+          pontos?: number
+          rodada?: number
+          scout?: Json | null
+        }
+        Relationships: []
+      }
       atleta_pontuacoes: {
         Row: {
           atleta_id: number | null
