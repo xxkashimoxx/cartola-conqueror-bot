@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Acti
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ResumoRodada from "@/components/ResumoRodada";
 import SyncNowButton from "@/components/SyncNowButton";
+import NewsCards from "@/components/NewsCards";
 
 interface Player {
   id: number;
@@ -244,6 +245,9 @@ const Dashboard = () => {
         {user && (
           <ResumoRodada />
         )}
+
+        <NewsCards limit={6} />
+
 
         <div className="mb-8">
           <h2 className="text-neon-red font-black text-2xl md:text-3xl mb-2">
