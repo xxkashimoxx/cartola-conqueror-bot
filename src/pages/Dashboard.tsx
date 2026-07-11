@@ -11,6 +11,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import ResumoRodada from "@/components/ResumoRodada";
 import SyncNowButton from "@/components/SyncNowButton";
 import NewsCards from "@/components/NewsCards";
+import LivePointsBadge from "@/components/LivePointsBadge";
+import { useLiveScores } from "@/hooks/useLiveScores";
 
 interface Player {
   id: number;
@@ -45,6 +47,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin } = useAuth();
+  const { scores: liveScores, rodada: liveRodada, online: liveOnline, lastUpdate: liveLastUpdate } = useLiveScores();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -250,9 +253,26 @@ const Dashboard = () => {
 
 
         <div className="mb-8">
-          <h2 className="text-neon-red font-black text-2xl md:text-3xl mb-2">
-            TOP ATLETAS DO CARTOLA
-          </h2>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
+            <h2 className="text-neon-red font-black text-2xl md:text-3xl">
+              TOP ATLETAS DO CARTOLA
+            </h2>
+            {liveScores.size > 0 && (
+              <div className="flex items-center gap-2 bg-neon-red/10 border border-neon-red/40 rounded-full px-3 py-1.5">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-red opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-neon-red" />
+                </span>
+                <span className="text-neon-red font-black text-xs uppercase tracking-widest">
+                  Ao vivo · Rodada {liveRodada}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  · {liveOnline ? "conectado" : "reconectando"}
+                  {liveLastUpdate && ` · atualizado ${new Date(liveLastUpdate).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`}
+                </span>
+              </div>
+            )}
+          </div>
           <p className="text-muted-foreground text-lg">
             Análise técnica baseada em performance real e estatísticas avançadas
           </p>
@@ -304,6 +324,9 @@ const Dashboard = () => {
                     </div>
 
                     <div className="space-y-3">
+                      {/* Pontuação AO VIVO */}
+                      <LivePointsBadge live={liveScores.get(player.id)} fallback={0} />
+
                       {/* Score de Potencial */}
                       <Tooltip>
                         <TooltipTrigger asChild>
