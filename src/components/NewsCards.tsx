@@ -83,7 +83,8 @@ const NewsCards = ({
       const { data } = (await Promise.race([invocation, aborted])) as any;
       if (controller.signal.aborted) return;
       if (data?.news) {
-        setNews(data.news.slice(0, limit));
+        // guardamos todo o pool para filtros; o `limit` só corta na renderização
+        setNews(data.news);
         setLastUpdate(Date.now());
         setStale(!!data.stale);
       }
