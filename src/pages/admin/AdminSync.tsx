@@ -104,46 +104,21 @@ const AdminSync = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button
-                onClick={handleSync}
-                disabled={syncing}
-                className="w-full gap-2"
-                size="lg"
-              >
-                <RefreshCw className={`h-5 w-5 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Sincronizando..." : "Iniciar Sincronização"}
-              </Button>
-
-              {lastResult && (
-                <div
-                  className={`p-4 rounded-lg flex items-start gap-3 ${
-                    lastResult.success
-                      ? "bg-success/10 border border-success/30"
-                      : "bg-destructive/10 border border-destructive/30"
-                  }`}
-                >
-                  {lastResult.success ? (
-                    <CheckCircle className="h-5 w-5 text-success mt-0.5" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-destructive mt-0.5" />
-                  )}
-                  <div>
-                    <p
-                      className={`font-medium ${
-                        lastResult.success ? "text-success" : "text-destructive"
-                      }`}
-                    >
-                      {lastResult.message}
-                    </p>
-                    {lastResult.stats && (
-                      <ul className="text-sm text-muted-foreground mt-2 space-y-1">
-                        <li>• {lastResult.stats.clubs || 0} clubes</li>
-                        <li>• {lastResult.stats.athletes || 0} jogadores</li>
-                      </ul>
-                    )}
-                  </div>
-                </div>
-              )}
+              <SyncNowButton
+                className="w-full"
+                variant="default"
+                label="Sincronizar agora"
+                onDone={() => {
+                  if (user) {
+                    supabase.from("sync_analytics").insert({
+                      sync_type: "full_sync",
+                      records_synced: 0,
+                      success: true,
+                      synced_by: user.id,
+                    });
+                  }
+                }}
+              />
             </CardContent>
           </Card>
 
