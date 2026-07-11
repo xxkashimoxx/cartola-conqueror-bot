@@ -282,25 +282,16 @@ const SyncNowButton = ({
               </div>
             )}
 
-            {result && (
-              <div
-                className={`p-3 rounded border flex items-start gap-2 text-sm ${
-                  result.success
-                    ? "bg-success/10 border-success/40 text-success"
-                    : "bg-destructive/10 border-destructive/40 text-destructive"
-                }`}
-              >
-                {result.success ? (
-                  <>
-                    <CheckCircle2 className="h-4 w-4 mt-0.5" />
-                    <span>Dados do Cartola atualizados com sucesso.</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="h-4 w-4 mt-0.5" />
-                    <span>{result.error}</span>
-                  </>
-                )}
+            {result && result.success && (
+              <div className="p-3 rounded border flex items-start gap-2 text-sm bg-success/10 border-success/40 text-success">
+                <CheckCircle2 className="h-4 w-4 mt-0.5" />
+                <span>Dados do Cartola atualizados com sucesso.</span>
+              </div>
+            )}
+            {result && !result.success && (
+              <div className="p-3 rounded border flex items-start gap-2 text-sm bg-destructive/10 border-destructive/40 text-destructive">
+                <AlertCircle className="h-4 w-4 mt-0.5" />
+                <span>{result.error}</span>
               </div>
             )}
           </div>
