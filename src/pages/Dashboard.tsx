@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { TrendingUp, TrendingDown, Minus, Users, Trophy, RefreshCw, Target, Activity, Zap, Swords, AlertTriangle, BarChart3, LineChart, Sparkles, Shield } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ResumoRodada from "@/components/ResumoRodada";
+import SyncNowButton from "@/components/SyncNowButton";
 
 interface Player {
   id: number;
@@ -155,15 +156,11 @@ const Dashboard = () => {
               Precisão &gt; Clubismo
             </h1>
             <div className="flex gap-2 flex-wrap justify-center">
-              <Button
-                onClick={syncCartolaData}
-                disabled={syncing}
-                variant="outline"
+              <SyncNowButton
                 className="border-2 border-neon-cyan hover:bg-card"
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Sincronizando...' : 'Atualizar Dados'}
-              </Button>
+                label="Sincronizar agora"
+                onDone={fetchPlayers}
+              />
               <Button
                 onClick={() => navigate("/confrontos")}
                 variant="outline"
