@@ -17,6 +17,8 @@ interface NewsCardsProps {
   title?: string;
   subtitle?: string;
   compact?: boolean;
+  /** Intervalo de atualização automática em minutos. 0 desativa. Padrão: 5min. */
+  refreshMinutes?: number;
 }
 
 const formatDate = (s: string) => {
