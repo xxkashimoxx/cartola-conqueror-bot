@@ -159,10 +159,92 @@ const NewsCards = ({
     return `há ${Math.floor(diff / 3600)}h`;
   };
 
+  // Dicionário de clubes/atletas para categorizar notícias
+  useEffect(() => {
+    (async () => {
+      const [clubesRes, atletasRes] = await Promise.all([
+        supabase.from("clubes").select("nome, abreviacao"),
+        supabase.from("atletas").select("apelido").order("media", { ascending: false }).limit(250),
+      ]);
+      const clubes = (clubesRes.data || [])
+        .flatMap((c: any) => [c.nome, c.abreviacao])
+        .filter((v: string) => v && v.length >= 3);
+      const atletas = (atletasRes.data || [])
+        .map((a: any) => a.apelido)
+        .filter((v: string) => v && v.length >= 3);
+      setClubeNames(Array.from(new Set(clubes)));
+      setAtletaNames(Array.from(new Set(atletas)));
+    })();
+  }, []);
+
+  const normalize = (s: string) =>
+    s
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+
+  // Palavras que indicam "próximo jogo / preview"
+  const PROXIMOS_KEYWORDS = useMemo(
+    () => [
+      "provavel", "escalacao", "escalado", "escala", "escalará",
+      "vai enfrentar", "encara", "recebe", "visita",
+      "duelo", "confronto", "classico",
+      "proximo jogo", "proxima rodada", "antes do jogo", "pre-jogo",
+      "onde assistir", "que horas", "escala time",
+    ],
+    []
+  );
+
+  const categorize = (n: NewsItem) => {
+    const text = normalize(`${n.title} ${n.description}`);
+    const hasClube = clubeNames.some((c) => text.includes(normalize(c)));
+    const hasAtleta = atletaNames.some((a) => text.includes(normalize(a)));
+    const isProximo = PROXIMOS_KEYWORDS.some((k) => text.includes(k));
+    return { hasClube, hasAtleta, isProximo };
+  };
+
+  const filteredNews = useMemo(() => {
+    const q = normalize(query.trim());
+    return news.filter((n) => {
+      // busca livre
+      if (q) {
+        const text = normalize(`${n.title} ${n.description}`);
+        if (!text.includes(q)) return false;
+      }
+      if (filter === "all") return true;
+      const { hasClube, hasAtleta, isProximo } = categorize(n);
+      if (filter === "jogadores") return hasAtleta;
+      if (filter === "times") return hasClube;
+      if (filter === "proximos") return isProximo || (hasClube && /\d{1,2}[hx:]\d{2}|hoje|amanha|domingo|sabado|sexta|quinta|quarta/i.test(normalize(n.title + " " + n.description)));
+      return true;
+    });
+  }, [news, filter, query, clubeNames, atletaNames, PROXIMOS_KEYWORDS]);
+
+  const counts = useMemo(() => {
+    const c = { all: news.length, jogadores: 0, times: 0, proximos: 0 };
+    for (const n of news) {
+      const { hasClube, hasAtleta, isProximo } = categorize(n);
+      if (hasAtleta) c.jogadores++;
+      if (hasClube) c.times++;
+      if (isProximo || hasClube) {
+        if (isProximo) c.proximos++;
+      }
+    }
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [news, clubeNames, atletaNames]);
+
+  const FILTERS: { key: typeof filter; label: string; icon: any; count: number }[] = [
+    { key: "all",       label: "Tudo",           icon: Globe2,        count: counts.all },
+    { key: "jogadores", label: "Jogadores",      icon: Users,         count: counts.jogadores },
+    { key: "times",     label: "Times",          icon: Shield,        count: counts.times },
+    { key: "proximos",  label: "Próximos jogos", icon: CalendarClock, count: counts.proximos },
+  ];
 
   const gridClass = compact
     ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
     : "grid md:grid-cols-2 lg:grid-cols-3 gap-6";
+
 
   return (
     <section className="w-full">
