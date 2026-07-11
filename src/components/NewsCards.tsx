@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ interface NewsCardsProps {
   title?: string;
   subtitle?: string;
   compact?: boolean;
+  /** Intervalo de atualização automática em minutos. 0 desativa. Padrão: 5min. */
+  refreshMinutes?: number;
 }
 
 const formatDate = (s: string) => {
@@ -35,32 +37,108 @@ const NewsCards = ({
   title = "Tá Rolando no Brasileirão",
   subtitle = "Últimas das partidas e do mercado. Fica ligado pra não perder mitada.",
   compact = false,
+  refreshMinutes = 5,
 }: NewsCardsProps) => {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<number | null>(null);
+  const inFlightRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const load = async () => {
+  const load = async ({ silent = false }: { silent?: boolean } = {}) => {
+    // Evita chamadas concorrentes (aba volta ao foco durante refresh, por ex.)
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    if (!silent) setRefreshing(true);
+
     try {
-      const { data } = await supabase.functions.invoke("news-brasileirao");
-      if (data?.news) setNews(data.news.slice(0, limit));
+      // functions.invoke não expõe signal — usamos race para não travar a UI
+      const invocation = supabase.functions.invoke("news-brasileirao");
+      const aborted = new Promise<never>((_, reject) => {
+        controller.signal.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+      const { data } = (await Promise.race([invocation, aborted])) as any;
+      if (controller.signal.aborted) return;
+      if (data?.news) {
+        setNews(data.news.slice(0, limit));
+        setLastUpdate(Date.now());
+      }
     } catch (e) {
-      console.error("Erro ao carregar notícias", e);
+      if ((e as Error)?.message !== "aborted") {
+        console.error("Erro ao carregar notícias", e);
+      }
     } finally {
+      inFlightRef.current = false;
       setLoading(false);
       setRefreshing(false);
     }
   };
 
+  // Carga inicial
   useEffect(() => {
-    load();
+    load({ silent: true });
+    return () => abortRef.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit]);
 
+  // Polling automático — pausa quando a aba está oculta e retoma no foco
+  useEffect(() => {
+    if (!refreshMinutes || refreshMinutes <= 0) return;
+    const intervalMs = refreshMinutes * 60_000;
+    let timer: number | undefined;
+
+    const tick = () => {
+      if (document.visibilityState === "visible") {
+        load({ silent: true });
+      }
+    };
+    const start = () => {
+      stop();
+      timer = window.setInterval(tick, intervalMs);
+    };
+    const stop = () => {
+      if (timer) {
+        window.clearInterval(timer);
+        timer = undefined;
+      }
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        // Se ficou oculto por mais que o intervalo, atualiza já
+        if (!lastUpdate || Date.now() - lastUpdate > intervalMs) {
+          load({ silent: true });
+        }
+        start();
+      } else {
+        stop();
+      }
+    };
+
+    start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshMinutes, limit]);
+
   const handleRefresh = () => {
-    setRefreshing(true);
-    load();
+    load({ silent: false });
   };
+
+  const formatRelative = (ts: number) => {
+    const diff = Math.floor((Date.now() - ts) / 1000);
+    if (diff < 60) return "agora";
+    if (diff < 3600) return `há ${Math.floor(diff / 60)}min`;
+    return `há ${Math.floor(diff / 3600)}h`;
+  };
+
 
   const gridClass = compact
     ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
@@ -80,15 +158,23 @@ const NewsCards = ({
             )}
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleRefresh}
-          disabled={refreshing || loading}
-          className="border-border shrink-0"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {lastUpdate && (
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Atualizado {formatRelative(lastUpdate)}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="border-border"
+            title={refreshMinutes > 0 ? `Auto-atualização a cada ${refreshMinutes}min` : "Atualizar"}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </div>
 
       {loading ? (
