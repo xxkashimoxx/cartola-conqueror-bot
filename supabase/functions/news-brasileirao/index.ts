@@ -1,7 +1,13 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const CACHE_KEY = 'brasileirao_v1';
+const CACHE_TTL_MS = 5 * 60 * 1000;      // 5 min: dentro disso serve do cache sem tocar RSS
+const FEED_TIMEOUT_MS = 6000;             // 6s por feed pra não travar
 
 interface NewsItem {
   title: string;
