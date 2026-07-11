@@ -158,15 +158,23 @@ const NewsCards = ({
             )}
           </div>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleRefresh}
-          disabled={refreshing || loading}
-          className="border-border shrink-0"
-        >
-          <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          {lastUpdate && (
+            <span className="text-xs text-muted-foreground hidden sm:inline">
+              Atualizado {formatRelative(lastUpdate)}
+            </span>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="border-border"
+            title={refreshMinutes > 0 ? `Auto-atualização a cada ${refreshMinutes}min` : "Atualizar"}
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
       </div>
 
       {loading ? (
