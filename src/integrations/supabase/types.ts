@@ -273,6 +273,27 @@ export type Database = {
         }
         Relationships: []
       }
+      news_cache: {
+        Row: {
+          cache_key: string
+          fetched_at: string
+          payload: Json
+          source_ok: boolean
+        }
+        Insert: {
+          cache_key: string
+          fetched_at?: string
+          payload: Json
+          source_ok?: boolean
+        }
+        Update: {
+          cache_key?: string
+          fetched_at?: string
+          payload?: Json
+          source_ok?: boolean
+        }
+        Relationships: []
+      }
       oportunidades: {
         Row: {
           atleta_id: number | null
