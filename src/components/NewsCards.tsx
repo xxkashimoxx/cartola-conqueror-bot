@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Newspaper, ExternalLink, RefreshCw } from "lucide-react";
+import { Newspaper, ExternalLink, RefreshCw, Search, X, Users, Shield, CalendarClock, Globe2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface NewsItem {
   title: string;
