@@ -45,6 +45,10 @@ const NewsCards = ({
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<number | null>(null);
   const [stale, setStale] = useState(false);
+  const [filter, setFilter] = useState<"all" | "jogadores" | "times" | "proximos">("all");
+  const [query, setQuery] = useState("");
+  const [clubeNames, setClubeNames] = useState<string[]>([]);
+  const [atletaNames, setAtletaNames] = useState<string[]>([]);
   const inFlightRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
