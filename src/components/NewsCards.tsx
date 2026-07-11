@@ -143,7 +143,8 @@ const NewsCards = ({
   }, [refreshMinutes, limit]);
 
   const handleRefresh = () => {
-    load({ silent: false });
+    // Clique manual força bypass do cache no backend
+    load({ silent: false, force: true });
   };
 
   const formatRelative = (ts: number) => {
