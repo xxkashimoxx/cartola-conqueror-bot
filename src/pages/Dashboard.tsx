@@ -47,6 +47,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { isAdmin } = useAuth();
+  const { scores: liveScores, rodada: liveRodada, online: liveOnline, lastUpdate: liveLastUpdate } = useLiveScores();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
