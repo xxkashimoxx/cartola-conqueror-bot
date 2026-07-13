@@ -146,11 +146,11 @@ const ResumoRodada = () => {
             </h4>
           </div>
 
-          {/* FREE */}
+          {/* Escalação Base */}
           <div className="bg-secondary/40 border border-border rounded p-3">
             <div className="flex items-center justify-between mb-1">
-              <Badge variant="outline" className="text-xs">FREE</Badge>
-              <span className="text-[10px] text-muted-foreground uppercase">Base segura</span>
+              <Badge variant="outline" className="text-xs">BASE</Badge>
+              <span className="text-[10px] text-muted-foreground uppercase">Time seguro</span>
             </div>
             <p className="text-muted-foreground text-xs mb-2 leading-relaxed">
               {resumo.escalacao_free.resumo}
@@ -164,44 +164,40 @@ const ResumoRodada = () => {
             </div>
           </div>
 
-          {/* PRO */}
+          {/* Mitada */}
           <div className="bg-gradient-to-br from-primary/10 to-card border-2 border-primary/50 rounded p-3 relative">
             <div className="flex items-center justify-between mb-1">
               <Badge className="bg-primary text-primary-foreground text-xs gap-1">
-                <Crown className="h-3 w-3" /> PRO
+                <Crown className="h-3 w-3" /> MITADA
               </Badge>
-              <span className="text-[10px] text-neon-cyan uppercase font-bold">Mitada</span>
+              <span className="text-[10px] text-neon-cyan uppercase font-bold">Diferencial</span>
             </div>
 
-            {isPaid ? (
-              <>
-                <p className="text-muted-foreground text-xs mb-2 leading-relaxed">
-                  {resumo.escalacao_pro.resumo}
-                </p>
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {resumo.escalacao_pro.jogadores.map((j, i) => (
-                    <span key={i} className="text-[11px] bg-background border border-primary/40 px-2 py-0.5 rounded text-foreground">
-                      {j}
-                    </span>
-                  ))}
-                </div>
-                <p className="text-[11px] text-neon-cyan italic border-t border-primary/30 pt-2">
-                  💡 {resumo.escalacao_pro.diferencial}
-                </p>
-              </>
-            ) : (
-              <div className="text-center py-4">
-                <Lock className="h-6 w-6 text-primary mx-auto mb-2" />
-                <p className="text-sm font-bold text-foreground">Escalação PRO trancada</p>
-                <p className="text-xs text-muted-foreground mt-1 mb-3">
-                  Surpresas + mitadas + diferencial de quem amassa a liga.
-                </p>
-                <Button size="sm" className="bg-primary hover:bg-primary/80 text-xs">
-                  Virar PRO
-                </Button>
-              </div>
-            )}
+            <p className="text-muted-foreground text-xs mb-2 leading-relaxed">
+              {resumo.escalacao_pro.resumo}
+            </p>
+            <div className="flex flex-wrap gap-1 mb-2">
+              {resumo.escalacao_pro.jogadores.map((j, i) => (
+                <span key={i} className="text-[11px] bg-background border border-primary/40 px-2 py-0.5 rounded text-foreground">
+                  {j}
+                </span>
+              ))}
+            </div>
+            <p className="text-[11px] text-neon-cyan italic border-t border-primary/30 pt-2">
+              💡 {resumo.escalacao_pro.diferencial}
+            </p>
           </div>
+        </section>
+
+        {/* Free access notice */}
+        <div className="mt-4 border border-neon-green/40 bg-neon-green/10 rounded p-3 text-center">
+          <p className="text-xs font-bold text-neon-green uppercase tracking-wider">
+            ✓ Todos os recursos liberados gratuitamente
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-1">
+            Foco total em desempenho e assertividade — sem planos, sem paywall.
+          </p>
+        </div>
         </section>
       </CardContent>
     </Card>
