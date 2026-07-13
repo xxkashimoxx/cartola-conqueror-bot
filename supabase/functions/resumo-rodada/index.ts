@@ -1,4 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { readCache, writeCache } from '../_shared/predictions-cache.ts';
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -41,17 +43,21 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     const rodada = mercado?.rodada_atual ?? 1;
-    const cacheKey = `resumo_rodada_${rodada}`;
+    const cacheKey = 'resumo_rodada';
 
-    // Cache em memória do worker
-    // @ts-ignore
-    const cache: Map<string, { at: number; data: ResumoRodada }> = (globalThis as any).__resumoCache ||= new Map();
-    const cached = cache.get(cacheKey);
-    if (!refresh && cached && Date.now() - cached.at < 6 * 60 * 60 * 1000) {
-      return new Response(JSON.stringify({ success: true, cached: true, ...cached.data }), {
+    // Cache persistente por rodada (invalidado por trigger em escalacoes_usuario)
+    const cached = await readCache(supabase, {
+      cacheKey,
+      rodada,
+      ttlSeconds: 6 * 60 * 60, // 6h
+      forceRefresh: refresh,
+    });
+    if (cached.hit && cached.payload) {
+      return new Response(JSON.stringify({ success: true, cached: true, ...cached.payload }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
 
     // Confrontos da rodada com nomes dos clubes
     const { data: partidas } = await supabase
@@ -172,7 +178,7 @@ Retorne EXATAMENTE este JSON:
       escalacao_pro: parsed.escalacao_pro || { resumo: '', jogadores: [], diferencial: '' },
     };
 
-    cache.set(cacheKey, { at: Date.now(), data: resumo });
+    await writeCache(supabase, { cacheKey, rodada, ttlSeconds: 6 * 60 * 60 }, resumo);
 
     return new Response(JSON.stringify({ success: true, cached: false, ...resumo }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
