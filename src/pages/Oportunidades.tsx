@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useUserPlan } from "@/hooks/useUserPlan";
-import LockedFeature, { canAccess } from "@/components/LockedFeature";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Oportunidade {
@@ -53,7 +51,7 @@ const tipoConfig: Record<string, { label: string; icon: React.ReactNode; color: 
 const Oportunidades = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { plan, loading: loadingPlan } = useUserPlan();
+  const loadingPlan = false;
   const [oportunidades, setOportunidades] = useState<Oportunidade[]>([]);
   const [loading, setLoading] = useState(true);
   const [rodada, setRodada] = useState(1);
@@ -96,16 +94,6 @@ const Oportunidades = () => {
     );
   }
 
-  if (!canAccess(plan, 'PREMIUM')) {
-    return (
-      <div className="min-h-screen bg-background p-6">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
-        </Button>
-        <LockedFeature feature="Oportunidades" currentPlan={plan} requiredPlan="PREMIUM" />
-      </div>
-    );
-  }
 
   // Agrupar por tipo
   const apostas = oportunidades.filter(o => o.tipo === 'APOSTA_DA_RODADA');

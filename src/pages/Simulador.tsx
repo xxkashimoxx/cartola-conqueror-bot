@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { useUserPlan } from "@/hooks/useUserPlan";
-import LockedFeature, { canAccess } from "@/components/LockedFeature";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TeamInput {
@@ -38,7 +36,7 @@ interface SimulationResult {
 const Simulador = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { plan, loading: loadingPlan } = useUserPlan();
+  const loadingPlan = false;
   const [teams, setTeams] = useState<TeamInput[]>([
     { name: "Time 1", playerIds: "" },
     { name: "Time 2", playerIds: "" },
@@ -46,7 +44,7 @@ const Simulador = () => {
   const [results, setResults] = useState<SimulationResult[] | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const maxTeams = canAccess(plan, 'MASTER') ? 3 : 2;
+  const maxTeams = 3;
 
   const addTeam = () => {
     if (teams.length < maxTeams) {
@@ -109,16 +107,6 @@ const Simulador = () => {
     );
   }
 
-  if (!canAccess(plan, 'PREMIUM')) {
-    return (
-      <div className="min-h-screen bg-background p-6">
-        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-6">
-          <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
-        </Button>
-        <LockedFeature feature="Simulador de Times" currentPlan={plan} requiredPlan="PREMIUM" />
-      </div>
-    );
-  }
 
   const sectorColors = {
     defense: 'bg-blue-500',

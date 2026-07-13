@@ -5,8 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useUserPlan } from "@/hooks/useUserPlan";
-import LockedFeature, { canAccess } from "@/components/LockedFeature";
 import { supabase } from "@/integrations/supabase/client";
 
 interface PlayerMarket {
@@ -32,7 +30,7 @@ interface PlayerMarket {
 const MercadoInteligente = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { plan, loading: loadingPlan } = useUserPlan();
+  const loadingPlan = false;
   const [valorizar, setValorizar] = useState<PlayerMarket[]>([]);
   const [desvalorizar, setDesvalorizar] = useState<PlayerMarket[]>([]);
   const [loading, setLoading] = useState(true);
