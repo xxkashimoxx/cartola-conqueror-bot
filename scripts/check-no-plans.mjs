@@ -12,6 +12,13 @@ const SRC = join(ROOT, "src");
 // Extensões inspecionadas
 const EXTS = new Set([".ts", ".tsx", ".js", ".jsx"]);
 
+// Arquivos/pastas auto-gerados ou de terceiros que não devem ser inspecionados.
+const IGNORED_PATHS = [
+  "src/integrations/supabase/client.ts",
+  "src/integrations/supabase/types.ts",
+];
+
+
 // Padrões proibidos. Cada item: { pattern: RegExp, label: string }
 // Todos aplicados ao conteúdo bruto do arquivo.
 const FORBIDDEN = [
@@ -47,9 +54,10 @@ function* walk(dir) {
 
 const violations = [];
 for (const file of walk(SRC)) {
-  const rel = relative(ROOT, file);
+  const rel = relative(ROOT, file).replaceAll("\\", "/");
   const ext = file.slice(file.lastIndexOf("."));
   if (!EXTS.has(ext)) continue;
+  if (IGNORED_PATHS.includes(rel)) continue;
   const content = readFileSync(file, "utf8");
   if (content.includes(BYPASS_MARKER)) continue;
 
