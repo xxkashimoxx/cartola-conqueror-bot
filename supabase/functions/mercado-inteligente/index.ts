@@ -72,15 +72,8 @@ serve(async (req) => {
       throw error;
     }
 
-    // Buscar próximas partidas para análise de mandante/visitante
-    const { data: mercadoStatus } = await supabase
-      .from('mercado_status')
-      .select('rodada_atual')
-      .order('id', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const rodadaAtual = mercadoStatus?.rodada_atual || 1;
+    // Reaproveita rodada já obtida acima
+    const rodadaAtual = rodadaAtualCache;
 
     const { data: partidas } = await supabase
       .from('partidas')
@@ -175,16 +168,18 @@ serve(async (req) => {
       planRequired = 'PRO';
     }
 
-    console.log(`Mercado Inteligente: ${valorizar.length} valorizar, ${desvalorizar.length} desvalorizar (plano: ${plan})`);
-
-    return new Response(JSON.stringify({
+    const responsePayload = {
       valorizar,
       desvalorizar,
       rodada: rodadaAtual,
       planRequired,
       totalValorizar: valorizarCandidates.length,
       totalDesvalorizar: desvalorizarCandidates.length,
-    }), {
+    };
+
+    await writeCache(supabase, { cacheKey, rodada: rodadaAtual, ttlSeconds: 600 }, responsePayload);
+
+    return new Response(JSON.stringify({ ...responsePayload, cached: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
