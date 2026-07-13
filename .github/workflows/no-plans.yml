@@ -1,0 +1,17 @@
+name: No Plans Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  no-plans:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Guard — nenhuma referência a planos/PRO/upgrade em src/
+        run: node scripts/check-no-plans.mjs
