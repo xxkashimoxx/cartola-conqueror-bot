@@ -2,12 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserPlan } from "@/hooks/useUserPlan";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, ArrowLeft, AlertTriangle, Ban, BedDouble } from "lucide-react";
-import LockedFeature, { canAccess } from "@/components/LockedFeature";
+
 import { useToast } from "@/hooks/use-toast";
 
 interface Atleta {
@@ -57,7 +56,7 @@ const tipoConfig = {
 const RadarAusencias = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { plan } = useUserPlan();
+  
   const { toast } = useToast();
   
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
@@ -107,36 +106,6 @@ const RadarAusencias = () => {
     );
   }
 
-  // Check plan access
-  if (!canAccess(plan, 'PREMIUM')) {
-    return (
-      <div className="min-h-screen bg-background">
-        <div className="bg-card border-b-2 border-border shadow-lg">
-          <div className="container mx-auto px-4 py-6">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" onClick={() => navigate("/dashboard")}>
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-neon-cyan font-black text-2xl md:text-3xl tracking-wider flex items-center gap-2">
-                  <AlertTriangle className="h-7 w-7" />
-                  RADAR DE AUSÊNCIAS
-                </h1>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="container mx-auto px-4 py-8">
-          <LockedFeature 
-            feature="Radar de Ausências" 
-            currentPlan={plan} 
-            requiredPlan="PREMIUM"
-          />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-background">

@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserPlan } from "@/hooks/useUserPlan";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, ArrowLeft, Shield, Swords, ChevronRight, Target, Users } from "lucide-react";
-import LockedFeature, { canAccess } from "@/components/LockedFeature";
+
 import RiskBadge from "@/components/RiskBadge";
 import { useToast } from "@/hooks/use-toast";
 
@@ -56,7 +56,7 @@ interface PartidaDetalhada {
 const Confrontos = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { plan } = useUserPlan();
+  
   const { toast } = useToast();
   
   const [partidas, setPartidas] = useState<Partida[]>([]);
@@ -95,14 +95,6 @@ const Confrontos = () => {
   };
 
   const fetchDetalhes = async (partidaId: string) => {
-    // Check plan access for detailed recommendations
-    if (!canAccess(plan, 'PREMIUM')) {
-      toast({
-        title: "Acesso restrito",
-        description: "Recomendações por setor requerem plano Premium",
-      });
-      return;
-    }
 
     try {
       setLoadingDetalhes(true);
@@ -295,16 +287,6 @@ const Confrontos = () => {
           </div>
         )}
 
-        {/* Premium Lock for recommendations */}
-        {!canAccess(plan, 'PREMIUM') && partidas.length > 0 && (
-          <div className="mt-8">
-            <LockedFeature 
-              feature="Recomendações por Setor" 
-              currentPlan={plan} 
-              requiredPlan="PREMIUM"
-            />
-          </div>
-        )}
       </div>
 
       {/* Sheet for detailed recommendations */}
