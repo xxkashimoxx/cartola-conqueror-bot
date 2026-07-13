@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { readCache, writeCache, shouldForceRefresh } from "../_shared/predictions-cache.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +36,20 @@ serve(async (req) => {
       if (mercado) {
         currentRound = mercado.rodada_atual;
       }
+    }
+
+    // Cache por rodada (invalidado automaticamente por trigger em escalacoes_usuario)
+    const force = shouldForceRefresh(req);
+    const cached = await readCache(supabase, {
+      cacheKey: 'oportunidades',
+      rodada: currentRound,
+      ttlSeconds: 600,
+      forceRefresh: force,
+    });
+    if (cached.hit && cached.payload) {
+      return new Response(JSON.stringify({ ...cached.payload, cached: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Buscar oportunidades cadastradas
@@ -130,11 +146,15 @@ serve(async (req) => {
 
     console.log(`[Oportunidades] Encontradas ${top.length} oportunidades`);
 
-    return new Response(JSON.stringify({
+    const responsePayload = {
       success: true,
       rodada: currentRound,
       data: top,
-    }), {
+    };
+
+    await writeCache(supabase, { cacheKey: 'oportunidades', rodada: currentRound, ttlSeconds: 600 }, responsePayload);
+
+    return new Response(JSON.stringify({ ...responsePayload, cached: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 

@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { readCache, writeCache, shouldForceRefresh } from "../_shared/predictions-cache.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -108,6 +110,20 @@ serve(async (req) => {
       });
     }
 
+    // Cache por rodada da listagem
+    const force = shouldForceRefresh(req);
+    const cached = await readCache(supabase, {
+      cacheKey: 'confrontos',
+      rodada: currentRound,
+      ttlSeconds: 600,
+      forceRefresh: force,
+    });
+    if (cached.hit && cached.payload) {
+      return new Response(JSON.stringify({ ...cached.payload, cached: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
     // Listar partidas da rodada
     const { data: partidas, error } = await supabase
       .from('partidas')
@@ -123,11 +139,15 @@ serve(async (req) => {
 
     console.log(`[Confrontos] Encontradas ${partidas?.length || 0} partidas`);
 
-    return new Response(JSON.stringify({
+    const responsePayload = {
       success: true,
       rodada: currentRound,
       data: partidas || [],
-    }), {
+    };
+
+    await writeCache(supabase, { cacheKey: 'confrontos', rodada: currentRound, ttlSeconds: 600 }, responsePayload);
+
+    return new Response(JSON.stringify({ ...responsePayload, cached: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 

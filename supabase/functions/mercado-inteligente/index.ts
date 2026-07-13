@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { readCache, writeCache, shouldForceRefresh } from "../_shared/predictions-cache.ts";
+
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,11 +15,35 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
 
     const url = new URL(req.url);
     const plan = url.searchParams.get('plan') || 'FREE';
+
+    // Descobrir rodada atual antes de qualquer processamento pesado
+    const { data: mercadoStatusEarly } = await supabase
+      .from('mercado_status')
+      .select('rodada_atual')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const rodadaAtualCache = mercadoStatusEarly?.rodada_atual || 1;
+
+    // Cache por rodada
+    const force = shouldForceRefresh(req);
+    const cacheKey = `mercado_inteligente_${plan}`;
+    const cachedResp = await readCache(supabase, {
+      cacheKey,
+      rodada: rodadaAtualCache,
+      ttlSeconds: 600,
+      forceRefresh: force,
+    });
+    if (cachedResp.hit && cachedResp.payload) {
+      return new Response(JSON.stringify({ ...cachedResp.payload, cached: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Buscar atletas com dados relevantes para análise de mercado
     const { data: atletas, error } = await supabase
@@ -46,15 +72,8 @@ serve(async (req) => {
       throw error;
     }
 
-    // Buscar próximas partidas para análise de mandante/visitante
-    const { data: mercadoStatus } = await supabase
-      .from('mercado_status')
-      .select('rodada_atual')
-      .order('id', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const rodadaAtual = mercadoStatus?.rodada_atual || 1;
+    // Reaproveita rodada já obtida acima
+    const rodadaAtual = rodadaAtualCache;
 
     const { data: partidas } = await supabase
       .from('partidas')
@@ -149,16 +168,18 @@ serve(async (req) => {
       planRequired = 'PRO';
     }
 
-    console.log(`Mercado Inteligente: ${valorizar.length} valorizar, ${desvalorizar.length} desvalorizar (plano: ${plan})`);
-
-    return new Response(JSON.stringify({
+    const responsePayload = {
       valorizar,
       desvalorizar,
       rodada: rodadaAtual,
       planRequired,
       totalValorizar: valorizarCandidates.length,
       totalDesvalorizar: desvalorizarCandidates.length,
-    }), {
+    };
+
+    await writeCache(supabase, { cacheKey, rodada: rodadaAtual, ttlSeconds: 600 }, responsePayload);
+
+    return new Response(JSON.stringify({ ...responsePayload, cached: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
