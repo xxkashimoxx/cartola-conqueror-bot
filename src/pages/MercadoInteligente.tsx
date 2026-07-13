@@ -196,11 +196,6 @@ const MercadoInteligente = () => {
                 Valorizar
                 <Badge className="bg-green-500/20 text-green-400">{valorizar.length}</Badge>
               </h2>
-              {plan === 'FREE' && totalValorizar > valorizar.length && (
-                <Badge variant="outline" className="text-xs">
-                  +{totalValorizar - valorizar.length} no PRO
-                </Badge>
-              )}
             </div>
 
             <p className="text-sm text-muted-foreground">
@@ -236,13 +231,7 @@ const MercadoInteligente = () => {
               Jogadores com risco de desvalorização: preço alto, queda de rendimento, visitante
             </p>
 
-            {!canAccess(plan, 'PRO') ? (
-              <LockedFeature 
-                feature="Análise de Armadilhas" 
-                currentPlan={plan} 
-                requiredPlan="PRO" 
-              />
-            ) : desvalorizar.length === 0 ? (
+            {desvalorizar.length === 0 ? (
               <Card className="bg-card/30 border-dashed">
                 <CardContent className="p-8 text-center text-muted-foreground">
                   Nenhuma armadilha identificada
@@ -257,26 +246,6 @@ const MercadoInteligente = () => {
             )}
           </div>
         </div>
-
-        {/* Upgrade CTA for FREE */}
-        {plan === 'FREE' && (
-          <Card className="mt-8 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
-            <CardContent className="p-6 flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Crown className="h-10 w-10 text-primary" />
-                <div>
-                  <h3 className="font-bold text-foreground">Desbloqueie o Mercado Completo</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Veja todas as {totalValorizar} oportunidades de valorização e {totalDesvalorizar} armadilhas
-                  </p>
-                </div>
-              </div>
-              <Button className="bg-primary hover:bg-primary/80 shadow-neon">
-                Fazer Upgrade
-              </Button>
-            </CardContent>
-          </Card>
-        )}
       </main>
     </div>
   );
