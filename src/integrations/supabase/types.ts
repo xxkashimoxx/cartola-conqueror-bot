@@ -407,6 +407,30 @@ export type Database = {
         }
         Relationships: []
       }
+      predictions_cache: {
+        Row: {
+          cache_key: string
+          fetched_at: string
+          payload: Json
+          rodada: number
+          ttl_seconds: number
+        }
+        Insert: {
+          cache_key: string
+          fetched_at?: string
+          payload: Json
+          rodada: number
+          ttl_seconds?: number
+        }
+        Update: {
+          cache_key?: string
+          fetched_at?: string
+          payload?: Json
+          rodada?: number
+          ttl_seconds?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -505,6 +529,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      invalidate_predictions_cache: {
+        Args: { _rodada: number }
+        Returns: undefined
       }
     }
     Enums: {
