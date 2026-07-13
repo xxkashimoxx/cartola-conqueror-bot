@@ -15,11 +15,35 @@ serve(async (req) => {
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
 
     const url = new URL(req.url);
     const plan = url.searchParams.get('plan') || 'FREE';
+
+    // Descobrir rodada atual antes de qualquer processamento pesado
+    const { data: mercadoStatusEarly } = await supabase
+      .from('mercado_status')
+      .select('rodada_atual')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const rodadaAtualCache = mercadoStatusEarly?.rodada_atual || 1;
+
+    // Cache por rodada
+    const force = shouldForceRefresh(req);
+    const cacheKey = `mercado_inteligente_${plan}`;
+    const cachedResp = await readCache(supabase, {
+      cacheKey,
+      rodada: rodadaAtualCache,
+      ttlSeconds: 600,
+      forceRefresh: force,
+    });
+    if (cachedResp.hit && cachedResp.payload) {
+      return new Response(JSON.stringify({ ...cachedResp.payload, cached: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Buscar atletas com dados relevantes para análise de mercado
     const { data: atletas, error } = await supabase
