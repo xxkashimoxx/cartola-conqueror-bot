@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw, ArrowLeft, AlertTriangle, Ban, BedDouble } from "lucide-react";
-import LockedFeature, { canAccess } from "@/components/LockedFeature";
+
 import { useToast } from "@/hooks/use-toast";
 
 interface Atleta {
@@ -56,7 +56,7 @@ const tipoConfig = {
 const RadarAusencias = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const { plan } = useUserPlan();
+  
   const { toast } = useToast();
   
   const [ausencias, setAusencias] = useState<Ausencia[]>([]);
