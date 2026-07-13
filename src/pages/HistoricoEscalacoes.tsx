@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, History, Loader2, TrendingUp, TrendingDown, Crown, Lock, Trophy } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserPlan } from "@/hooks/useUserPlan";
+
 import { cn } from "@/lib/utils";
 import {
   LineChart,
@@ -45,8 +45,6 @@ interface RodadaResumo {
 const HistoricoEscalacoes = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { plan } = useUserPlan();
-  const isPaid = plan && plan !== "FREE";
 
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<EscalacaoRow[]>([]);
@@ -358,44 +356,31 @@ const HistoricoEscalacoes = () => {
                         </div>
                       </div>
 
-                      {/* Detalhamento PRO */}
-                      {isPaid ? (
-                        r.trocas > 0 && (
-                          <div className="pt-3 border-t border-border">
-                            <p className="text-[10px] font-black uppercase tracking-wider text-neon-cyan mb-2 flex items-center gap-1">
-                              <Crown className="h-3 w-3" /> Trocas vs recomendada ({r.trocas})
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {r.minhaIds
-                                .filter((id) => !new Set(r.recIds).has(id))
-                                .map((id) => (
-                                  <Badge
-                                    key={id}
-                                    variant="outline"
-                                    className="text-[10px] border-primary/50 text-foreground"
-                                  >
-                                    {atletasMap[id] ?? `#${id}`}
-                                    {pontosPorRodada[`${id}-${r.rodada}`] !== undefined && (
-                                      <span className="ml-1 text-neon-green">
-                                        ({pontosPorRodada[`${id}-${r.rodada}`].toFixed(1)})
-                                      </span>
-                                    )}
-                                  </Badge>
-                                ))}
-                            </div>
+                      {/* Detalhamento de trocas */}
+                      {r.trocas > 0 && (
+                        <div className="pt-3 border-t border-border">
+                          <p className="text-[10px] font-black uppercase tracking-wider text-neon-cyan mb-2 flex items-center gap-1">
+                            <Crown className="h-3 w-3" /> Trocas vs recomendada ({r.trocas})
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {r.minhaIds
+                              .filter((id) => !new Set(r.recIds).has(id))
+                              .map((id) => (
+                                <Badge
+                                  key={id}
+                                  variant="outline"
+                                  className="text-[10px] border-primary/50 text-foreground"
+                                >
+                                  {atletasMap[id] ?? `#${id}`}
+                                  {pontosPorRodada[`${id}-${r.rodada}`] !== undefined && (
+                                    <span className="ml-1 text-neon-green">
+                                      ({pontosPorRodada[`${id}-${r.rodada}`].toFixed(1)})
+                                    </span>
+                                  )}
+                                </Badge>
+                              ))}
                           </div>
-                        )
-                      ) : (
-                        r.trocas > 0 && (
-                          <div className="pt-3 border-t border-border flex items-center justify-between text-xs">
-                            <span className="text-muted-foreground flex items-center gap-1">
-                              <Lock className="h-3 w-3" /> {r.trocas} trocas detalhadas no PRO
-                            </span>
-                            <Button size="sm" variant="outline" className="h-7 text-[10px]">
-                              <Crown className="mr-1 h-3 w-3" /> Virar PRO
-                            </Button>
-                          </div>
-                        )
+                        </div>
                       )}
                     </Card>
                   );

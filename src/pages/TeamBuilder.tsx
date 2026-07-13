@@ -7,7 +7,7 @@ import { ArrowLeft, Zap, Trophy, Shield, Flame, Scale, Loader2, Save, GitCompare
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { useUserPlan } from "@/hooks/useUserPlan";
+
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -104,8 +104,6 @@ const TeamBuilder = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { plan } = useUserPlan();
-  const isPaid = plan && plan !== "FREE";
 
   const [strategy, setStrategy] = useState<Strategy>("balanceada");
   const [atletas, setAtletas] = useState<Atleta[]>([]);
@@ -321,45 +319,32 @@ const TeamBuilder = () => {
             </div>
           </div>
 
-          {/* Detalhamento PRO */}
-          {isPaid ? (
-            changedCount > 0 && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <p className="text-xs font-black uppercase tracking-wider text-neon-cyan mb-2 flex items-center gap-1">
-                  <Crown className="h-3 w-3" /> Diferenças jogador a jogador (PRO)
-                </p>
-                <div className="space-y-1">
-                  {myLineup.map((mine, idx) => {
-                    const rec = recommended[idx];
-                    if (!rec || mine.id === rec.id) return null;
-                    const delta = Number(mine.media ?? 0) - Number(rec.media ?? 0);
-                    return (
-                      <div key={mine.id} className="flex items-center justify-between text-xs bg-secondary/30 border border-border rounded p-2">
-                        <span className="text-muted-foreground">
-                          <span className="text-destructive line-through">{rec.apelido}</span>
-                          {" → "}
-                          <span className="text-foreground font-bold">{mine.apelido}</span>
-                          <span className="text-muted-foreground"> ({POS_LABEL[mine.posicao_id ?? 0]})</span>
-                        </span>
-                        <span className={cn("font-black", delta >= 0 ? "text-neon-green" : "text-destructive")}>
-                          {delta >= 0 ? "+" : ""}{delta.toFixed(2)}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )
-          ) : (
-            <div className="mt-4 pt-4 border-t border-border text-center">
-              <Lock className="h-5 w-5 text-primary mx-auto mb-1" />
-              <p className="text-sm font-bold text-foreground">Detalhamento jogador a jogador</p>
-              <p className="text-xs text-muted-foreground mb-2">
-                Veja exatamente quanto cada troca soma ou subtrai. Disponível no PRO.
+          {/* Detalhamento jogador a jogador */}
+          {changedCount > 0 && (
+            <div className="mt-4 pt-4 border-t border-border">
+              <p className="text-xs font-black uppercase tracking-wider text-neon-cyan mb-2 flex items-center gap-1">
+                <Crown className="h-3 w-3" /> Diferenças jogador a jogador
               </p>
-              <Button size="sm" className="bg-primary hover:bg-primary/80 text-xs">
-                <Crown className="mr-1 h-3 w-3" /> Virar PRO
-              </Button>
+              <div className="space-y-1">
+                {myLineup.map((mine, idx) => {
+                  const rec = recommended[idx];
+                  if (!rec || mine.id === rec.id) return null;
+                  const delta = Number(mine.media ?? 0) - Number(rec.media ?? 0);
+                  return (
+                    <div key={mine.id} className="flex items-center justify-between text-xs bg-secondary/30 border border-border rounded p-2">
+                      <span className="text-muted-foreground">
+                        <span className="text-destructive line-through">{rec.apelido}</span>
+                        {" → "}
+                        <span className="text-foreground font-bold">{mine.apelido}</span>
+                        <span className="text-muted-foreground"> ({POS_LABEL[mine.posicao_id ?? 0]})</span>
+                      </span>
+                      <span className={cn("font-black", delta >= 0 ? "text-neon-green" : "text-destructive")}>
+                        {delta >= 0 ? "+" : ""}{delta.toFixed(2)}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </Card>
