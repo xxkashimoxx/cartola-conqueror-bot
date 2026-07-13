@@ -3,8 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { useUserPlan } from "@/hooks/useUserPlan";
-import { Flame, Lock, RefreshCw, Sparkles, Swords, Trophy, Crown } from "lucide-react";
+import { Flame, RefreshCw, Sparkles, Swords, Trophy, Crown } from "lucide-react";
 
 interface Resumo {
   rodada: number;
@@ -20,9 +19,6 @@ const ResumoRodada = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { plan } = useUserPlan();
-
-  const isPaid = plan && plan !== "FREE";
 
   const load = async (refresh = false) => {
     try {
@@ -198,7 +194,6 @@ const ResumoRodada = () => {
             Foco total em desempenho e assertividade — sem planos, sem paywall.
           </p>
         </div>
-        </section>
       </CardContent>
     </Card>
   );
