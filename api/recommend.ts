@@ -40,14 +40,14 @@ function compute(raw:any,points:number[],context:{opponent:string;home:boolean;o
  const reliability=clamp((games-2)/14,0,1);
  const ranks=context?.ownRank&&context?.opponentRank ? clamp((context.opponentRank-context.ownRank)/19,-1,1):0;
  // modest adjustments only: avoid overfitting league rank and home/away advantages
- const matchFactor=clamp(1+(context?.home===true?.045:context?.home===false?-.035:0)+ranks*.095,.82,1.18);
+ const matchFactor=clamp(1+(context?.home===true ? 0.045 : context?.home===false ? -0.035 : 0)+ranks*.095,.82,1.18);
  const predicted=clamp(blended*matchFactor,-1,22);
  const def=[1,2,3].includes(raw.posicao_id);
  const att=[4,5].includes(raw.posicao_id);
  const stability=clamp(1-volatility*.12,.72,1);
  const base=predicted;
- const objective=mode==="ofensiva" ? base+deviation*.29+(att?.14:0)+Math.max(0,base-5)*.045 :
-   mode==="defensiva" ? base-deviation*.33+reliability*.5+(def?.12:0) :
+ const objective=mode==="ofensiva" ? base+deviation*.29+(att ? 0.14 : 0)+Math.max(0,base-5)*.045 :
+   mode==="defensiva" ? base-deviation*.33+reliability*.5+(def ? 0.12 : 0) :
    base*stability-deviation*.08+reliability*.19;
  return {id:raw.id,apelido:raw.apelido,nome:raw.nome,clube_id:raw.clube_id,posicao_id:raw.posicao_id,
   preco:price,media:average,jogos:games,status_id:raw.status_id,variacao_preco:num(raw.variacao_preco),
