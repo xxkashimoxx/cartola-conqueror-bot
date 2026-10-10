@@ -70,6 +70,11 @@ const TeamBuilder = () => {
   const [optimizing,setOptimizing]=useState(false);
   const [optimizerError,setOptimizerError]=useState<string|null>(null);
   const [captainId,setCaptainId]=useState<number|null>(null);
+  const [suggestedCaptainId,setSuggestedCaptainId]=useState<number|null>(null);
+  const [savedTeam,setSavedTeam]=useState<{ids:number[];captainId:number|null;updatedAt:string}|null>(null);
+  const [savedLoaded,setSavedLoaded]=useState(false);
+  const [actualScore,setActualScore]=useState<any>(null);
+  const [actualLoading,setActualLoading]=useState(false);
   const [marketOpen,setMarketOpen]=useState(false);
   const [optimizerContext,setOptimizerContext]=useState("");
 
@@ -104,12 +109,11 @@ const TeamBuilder = () => {
         if(!alive)return;
         const projected=data.players as Atleta[];
         setRecommended(projected);
-        setMyLineup(projected);
         if(Array.isArray(data.projections)){
           const projectedMap=new Map<number,any>(data.projections.map((p:any)=>[Number(p.id),p]));
           setAtletas(previous=>previous.map(a=>({...a,...(projectedMap.get(a.id)||{})})));
         }
-        setCaptainId(data.captainId||null);
+        setSuggestedCaptainId(data.captainId||null);
         setMarketOpen(!!data.mercadoAberto);
         setOptimizerContext(data.cardsReviewed+" atletas analisados · "+data.teamsUsed+" clubes · formação "+data.formation);
       }catch(error){
@@ -120,32 +124,70 @@ const TeamBuilder = () => {
     return()=>{alive=false;controller.abort()};
   },[rodada,atletas.length,strategy,budget]);
 
-  // Sincroniza minha escalação quando muda recomendada (primeira vez ou reset)
-  useEffect(() => {
-    if (recommended.length && myLineup.length === 0) {
-      setMyLineup(recommended);
-    }
-  }, [recommended]);
-
-  // Recover the private owner's previously saved lineup.
+  // The saved roster is the owner's source of truth; changing modes never modifies it.
   useEffect(()=>{
     if(!user||!rodada||!atletas.length)return;
-    let alive=true;
+    let active=true;
+    setSavedLoaded(false);
     (async()=>{
       try{
-        const res=await fetch("/api/lineups?rodada="+rodada,{credentials:"same-origin"});
-        if(!res.ok)return;
-        const data=await res.json();
-        const saved=(data.rows||[]).find((row:any)=>row.tipo==="minha");
-        if(saved?.atleta_ids?.length===12&&alive){
+        const response=await fetch("/api/lineups?rodada="+rodada,{credentials:"same-origin",cache:"no-store"});
+        if(!response.ok)throw Error("Falha ao carregar o time salvo.");
+        const payload=await response.json();
+        const mine=(payload.rows||[]).find((r:any)=>r.tipo==="minha");
+        if(!active)return;
+        if(mine?.atleta_ids?.length===12){
           const map=new Map(atletas.map(a=>[a.id,a]));
-          const lineup=saved.atleta_ids.map((id:number)=>map.get(id)).filter(Boolean);
-          if(lineup.length===12)setMyLineup(lineup);
+          const stored=mine.atleta_ids.map((id:number)=>map.get(id)).filter(Boolean) as Atleta[];
+          setSavedTeam({ids:mine.atleta_ids,captainId:mine.captain_id??null,updatedAt:mine.updated_at});
+          if(stored.length===12)setMyLineup(stored);
+          setCaptainId(mine.captain_id??null);
+          setActualScore(mine.score||null);
+        }else{
+          setSavedTeam(null);
+          setMyLineup([]);
+          setCaptainId(null);
         }
-      }catch(e){console.warn("Histórico indisponível",e)}
-    })();return()=>{alive=false};
-  },[user,rodada,atletas]);
+      }catch(e){
+        console.warn("Falha na recuperação de Meu Time",e);
+        // Avoid overwriting a possible saved team when the backend is unreachable.
+      }finally{if(active)setSavedLoaded(true);}
+    })();
+    return()=>{active=false};
+  },[user?.id,rodada,atletas.length]);
 
+  useEffect(()=>{
+    if(savedLoaded&&!savedTeam&&recommended.length&&myLineup.length===0){
+      setMyLineup(recommended);
+      setCaptainId(suggestedCaptainId);
+    }
+  },[savedLoaded,savedTeam,recommended,myLineup.length,suggestedCaptainId]);
+
+  // Recalculate the hypothetical score for the exact current draft, including captain.
+  useEffect(()=>{
+    if(!rodada||myLineup.length!==12||!savedLoaded)return;
+    let active=true;
+    const controller=new AbortController();
+    const refresh=async()=>{
+      if(!active||document.visibilityState==="hidden")return;
+      setActualLoading(true);
+      try{
+        const response=await fetch("/api/score",{method:"POST",credentials:"same-origin",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({rodada,ids:myLineup.map(a=>a.id),captainId}),signal:controller.signal});
+        const result=await response.json();
+        if(active&&response.ok)setActualScore(result);
+      }catch(e){if(active&&!controller.signal.aborted)console.warn("Pontuação temporariamente indisponível",e)}
+      finally{if(active)setActualLoading(false);}
+    };
+    void refresh();
+    const interval=window.setInterval(refresh,25000);
+    document.addEventListener("visibilitychange",refresh);
+    return()=>{active=false;controller.abort();window.clearInterval(interval);document.removeEventListener("visibilitychange",refresh)};
+  },[rodada,savedLoaded,captainId,myLineup.map(a=>a.id).join(",")]);
+
+  const isSavedCurrent=!!savedTeam&&myLineup.length===12&&
+    myLineup.every((a,i)=>a.id===savedTeam.ids[i])&&captainId===savedTeam.captainId;
   const handleSwap = (newAtleta: Atleta) => {
     if (!swapping) return;
     setMyLineup((cur) => cur.map((a) => (a.id === swapping.id ? newAtleta : a)));
@@ -154,7 +196,8 @@ const TeamBuilder = () => {
 
   const handleReset = () => {
     setMyLineup(recommended);
-    toast({ title: "Escalação resetada", description: "Voltou pra recomendada." });
+    setCaptainId(suggestedCaptainId);
+    toast({ title: "Sugestão aplicada ao rascunho", description: "Seu time salvo não será modificado até clicar em Salvar." });
   };
 
   const handleSave = async () => {
@@ -170,15 +213,19 @@ const TeamBuilder = () => {
     let error:Error|null=null;
     if(myLineup.length!==12||recommended.length!==12){
       error=new Error("Escalação incompleta: são necessários 11 atletas e um técnico.");
+    }else if(captainId===null||!myLineup.some(a=>a.id===captainId&&a.posicao_id!==6)){
+      error=new Error("Escolha o capitão antes de salvar (o técnico não pode ser capitão).");
     }else if(sumPreco(myLineup)>budget){
       error=new Error("Seu time excedeu o patrimônio informado.");
     }else{
       try{
         const result=await fetch("/api/lineups",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},
           body:JSON.stringify({rodada,estrategia:strategy,
-            mine:{ids:myLineup.map(a=>a.id),score:projectedWithCaptain(myLineup,captainId),price:sumPreco(myLineup)},
-            recommended:{ids:recommended.map(a=>a.id),score:projectedWithCaptain(recommended,captainId),price:sumPreco(recommended)}})});
+            mine:{ids:myLineup.map(a=>a.id),captainId,score:projectedWithCaptain(myLineup,captainId),price:sumPreco(myLineup)},
+            recommended:{ids:recommended.map(a=>a.id),captainId:suggestedCaptainId,score:projectedWithCaptain(recommended,suggestedCaptainId),price:sumPreco(recommended)}})});
         const data=await result.json();if(!result.ok)throw Error(data.error||"Erro ao salvar");
+        setSavedTeam({ids:myLineup.map(a=>a.id),captainId,updatedAt:new Date().toISOString()});
+        if(data.score)setActualScore(data.score);
       }catch(e){error=e instanceof Error?e:new Error("Falha de rede")}
     }
     setSaving(false);
@@ -191,7 +238,7 @@ const TeamBuilder = () => {
 
   // Comparação
   const myTotal = projectedWithCaptain(myLineup,captainId);
-  const recTotal = projectedWithCaptain(recommended,captainId);
+  const recTotal = projectedWithCaptain(recommended,suggestedCaptainId);
   const diff = myTotal - recTotal;
   const myPrice = sumPreco(myLineup);
   const recIds = new Set(recommended.map((a) => a.id));
