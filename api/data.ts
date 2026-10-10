@@ -5,6 +5,12 @@ const TABLES=new Set(["atletas","clubes","posicoes","mercado_status","atleta_par
 const WRITE_TABLES=new Set(["sync_analytics"]);
 const ident=(name:any)=>typeof name==="string"&&/^[a-z][a-z0-9_]*$/.test(name)&&name.length<=70;
 const sql=neon(process.env.DATABASE_URL||"");
+const NUMERIC_COLUMNS=new Set(["preco","media","jogos","pontos_num","variacao_preco","pontos","score","valor_total","pontos_esperados","probabilidade","xg_casa","xg_fora","clean_sheet_casa","clean_sheet_fora","peso","rodada_atual","status_mercado"]);
+function normalized(row:any){
+  if(!row||typeof row!=="object")return row;
+  return Object.fromEntries(Object.entries(row).map(([k,v])=>[k,NUMERIC_COLUMNS.has(k)&&typeof v==="string"&&v.trim()!==""&&Number.isFinite(Number(v))?Number(v):v]));
+}
+
 export default async function handler(req:any,res:any){
  if(!ownerOnly(req,res))return;
  if(req.method!=="POST")return res.status(405).json({data:null,error:{message:"Método inválido"}});
@@ -61,7 +67,7 @@ export default async function handler(req:any,res:any){
   const limit=Math.max(1,Math.min(15000,Number(body.limit)||1000));
   const result=await sql.query("select "+projection+" from public."+table+where+orderSql+" limit "+limit,args);
   if(body.single&&result.length!==1)return res.status(200).json({data:null,count,error:{message:"Resultado único não encontrado"}});
-  return res.status(200).json({data:body.single||body.maybeSingle?result[0]||null:result,count,error:null});
+  return res.status(200).json({data:body.single||body.maybeSingle?normalized(result[0]||null):result.map(normalized),count,error:null});
  }catch(e){console.error("API de dados:",e instanceof Error?e.message:"erro");
   return res.status(400).json({data:null,error:{message:e instanceof Error?e.message:"Falha na consulta"}});}
 }
