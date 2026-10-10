@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "functions": {
+    "api/cartola.ts": {
+      "maxDuration": 300
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
