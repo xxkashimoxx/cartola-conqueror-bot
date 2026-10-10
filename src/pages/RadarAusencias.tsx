@@ -93,10 +93,8 @@ const RadarAusencias = () => {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchAusencias();
-    }
-  }, [user]);
+    fetchAusencias();
+  }, []);
 
   if (authLoading) {
     return (
