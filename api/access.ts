@@ -9,11 +9,11 @@ export default async function handler(req:any,res:any){
  const sql=neon(process.env.DATABASE_URL||"");
  try{
   const key=loginHash(req);
-  const updated=await sql.query(\`insert into public.private_login_limits(client_hash,attempts,window_start)
+  const updated=await sql.query(`insert into public.private_login_limits(client_hash,attempts,window_start)
      values($1,1,now()) on conflict(client_hash) do update
      set attempts=case when private_login_limits.window_start<now()-interval '15 minutes' then 1 else private_login_limits.attempts+1 end,
          window_start=case when private_login_limits.window_start<now()-interval '15 minutes' then now() else private_login_limits.window_start end
-     returning attempts\`,[key]);
+     returning attempts`,[key]);
   if(Number(updated[0]?.attempts)>5)return reply(res,429,{error:"Muitas tentativas. Tente novamente em 15 minutos."});
   if(!verifyPassword(req.body?.password))return reply(res,401,{error:"Senha inválida."});
   await sql.query("delete from public.private_login_limits where client_hash=$1",[key]);
