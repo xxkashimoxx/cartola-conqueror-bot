@@ -3,12 +3,27 @@
   "functions": {
     "api/cartola.ts": {
       "maxDuration": 300
+    },
+    "api/cron.ts": {
+      "maxDuration": 300
+    },
+    "api/analytics.ts": {
+      "maxDuration": 60
+    },
+    "api/live.ts": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron?task=full",
+      "schedule": "0 13 * * *"
     }
   ]
 }
