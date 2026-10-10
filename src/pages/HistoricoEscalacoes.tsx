@@ -58,13 +58,10 @@ const HistoricoEscalacoes = () => {
     }
     (async () => {
       setLoading(true);
-      const { data } = await supabase
-        .from("escalacoes_usuario")
-        .select("rodada,tipo,estrategia,atleta_ids,pontos_esperados,valor_total,updated_at")
-        .eq("user_id", user.id)
-        .order("rodada", { ascending: true });
-
-      const list = (data ?? []) as EscalacaoRow[];
+      const response=await fetch("/api/lineups",{credentials:"same-origin",cache:"no-store"});
+      if(!response.ok){setRows([]);setLoading(false);return;}
+      const payload=await response.json();
+      const list = (payload.rows ?? []) as EscalacaoRow[];
       setRows(list);
 
       // Pega pontuações reais
