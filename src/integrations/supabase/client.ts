@@ -6,7 +6,7 @@ type InvokeOptions = { body?: unknown; headers?: Record<string, string> };
 async function invoke(name: string, options: InvokeOptions = {}) {
   try {
     const { data: { session } } = await neon.auth.getSession();
-    const response = await fetch("/api/cartola?name=" + encodeURIComponent(name), {
+    const response = await fetch(( ["confrontos","ausencias","oportunidades","mercado-inteligente","simulador","resumo-rodada","news-brasileirao"].includes(name) ? "/api/analytics?name=" : "/api/cartola?name=" ) + encodeURIComponent(name), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
