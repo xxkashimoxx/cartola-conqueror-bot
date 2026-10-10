@@ -25,10 +25,10 @@ interface Partida {
   data_partida: string;
   time_casa: Clube;
   time_fora: Clube;
-  clean_sheet_casa: number;
-  clean_sheet_fora: number;
-  xg_casa: number;
-  xg_fora: number;
+  clean_sheet_casa: number | null;
+  clean_sheet_fora: number | null;
+  xg_casa: number | null;
+  xg_fora: number | null;
 }
 
 interface Atleta {
@@ -236,9 +236,9 @@ const Confrontos = () => {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-foreground">
-                          {(partida.clean_sheet_casa * 100).toFixed(0)}%
+                          {partida.clean_sheet_casa == null ? "N/D" : (partida.clean_sheet_casa * 100).toFixed(0) + "%"}
                         </span>
-                        <RiskBadge level={getRiscoSG(partida.clean_sheet_casa)} />
+                        {partida.clean_sheet_casa != null && <RiskBadge level={getRiscoSG(partida.clean_sheet_casa)} />}
                       </div>
                     </div>
 
@@ -249,9 +249,9 @@ const Confrontos = () => {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-foreground">
-                          {(partida.clean_sheet_fora * 100).toFixed(0)}%
+                          {partida.clean_sheet_fora == null ? "N/D" : (partida.clean_sheet_fora * 100).toFixed(0) + "%"}
                         </span>
-                        <RiskBadge level={getRiscoSG(partida.clean_sheet_fora)} />
+                        {partida.clean_sheet_fora != null && <RiskBadge level={getRiscoSG(partida.clean_sheet_fora)} />}
                       </div>
                     </div>
 
@@ -261,7 +261,7 @@ const Confrontos = () => {
                         <span className="text-muted-foreground">xG Casa</span>
                       </div>
                       <span className="font-bold text-foreground">
-                        {partida.xg_casa?.toFixed(1) || '1.0'}
+                        {partida.xg_casa == null ? 'N/D' : partida.xg_casa.toFixed(1)}
                       </span>
                     </div>
 
@@ -271,7 +271,7 @@ const Confrontos = () => {
                         <span className="text-muted-foreground">xG Fora</span>
                       </div>
                       <span className="font-bold text-foreground">
-                        {partida.xg_fora?.toFixed(1) || '1.0'}
+                        {partida.xg_fora == null ? 'N/D' : partida.xg_fora.toFixed(1)}
                       </span>
                     </div>
                   </div>
