@@ -1,6 +1,8 @@
+import {ownerOnly} from "../server/owner.js";
 // Brasileirão Série A and Cartola FC 2026 live official round.
 export default async function handler(req:any,res:any){
  if(req.method!=="GET")return res.status(405).json({error:"Método inválido"});
+ if(!ownerOnly(req,res))return;
  try{
   const statusReq=await fetch("https://api.cartolafc.globo.com/mercado/status",{signal:AbortSignal.timeout(10000)});
   if(!statusReq.ok)throw new Error("Não foi possível consultar o mercado");
