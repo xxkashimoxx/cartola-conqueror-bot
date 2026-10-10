@@ -46,20 +46,8 @@ const MercadoInteligente = () => {
         headers: {},
       });
 
-      // Passar o plano via query param
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mercado-inteligente?plan=MASTER`,
-        {
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
-      if (!response.ok) throw new Error('Erro ao buscar dados');
-
-      const result = await response.json();
+      if (error) throw error;
+      const result = data;
       setValorizar(result.valorizar || []);
       setDesvalorizar(result.desvalorizar || []);
       setRodada(result.rodada || 1);
