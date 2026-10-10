@@ -302,6 +302,50 @@ const TeamBuilder = () => {
           {optimizerContext&&<p className="text-xs text-muted-foreground">{optimizerContext} · Capitão sugerido: {recommended.find(a=>a.id===captainId)?.apelido||"—"} (1,5×)</p>}
           {optimizerError&&<p className="text-sm text-destructive">{optimizerError}</p>}
         </Card>
+        {savedTeam && (
+          <Card className="p-4 mb-4 border-neon-green/50 bg-neon-green/5">
+            <div className="flex justify-between flex-wrap gap-2">
+              <div>
+                <p className="text-sm font-bold text-neon-green">Meu Time salvo · rodada {rodada}</p>
+                <p className="text-xs text-muted-foreground">Este time está armazenado no Neon, inclusive durante mercado fechado.</p>
+              </div>
+              <Badge variant="outline" className={isSavedCurrent?"border-neon-green text-neon-green":"border-amber-500 text-amber-500"}>
+                {isSavedCurrent?"Salvo e fixo":"Rascunho alterado · clique em Salvar"}
+              </Badge>
+            </div>
+          </Card>
+        )}
+        <Card className="p-5 mb-5 border-primary/40 space-y-3">
+          <div className="flex flex-wrap justify-between gap-3 items-start">
+            <div>
+              <h2 className="text-lg font-black">Pontuação que este time faria no Cartola FC</h2>
+              <p className="text-xs text-muted-foreground">Rodada {rodada} · {actualScore?.source || "Consultando Cartola FC"} · {isSavedCurrent?"time salvo":"rascunho atual"}</p>
+            </div>
+            <Badge variant="outline">{actualScore?.status==="encerrada"?"Resultado da rodada":actualScore?.status?.includes("parcial")?"Pontuação parcial / ao vivo":"Aguardando dados"}</Badge>
+          </div>
+          <div className="flex flex-wrap gap-6 items-baseline">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase">Total hipotético</p>
+              <p className="text-3xl font-black text-neon-green">{actualScore?.total==null?"—":Number(actualScore.total).toFixed(2)} <span className="text-base">pts</span></p>
+            </div>
+            <div><p className="text-xs text-muted-foreground uppercase">Pontos dos titulares</p><p className="text-xl font-bold">{actualScore?.base==null?"—":Number(actualScore.base).toFixed(2)}</p></div>
+            <div><p className="text-xs text-muted-foreground uppercase">Bônus do capitão</p><p className="text-xl font-bold">{actualScore?.captainBonus==null?"Escolha o capitão":Number(actualScore.captainBonus).toFixed(2)}</p></div>
+            <div><p className="text-xs text-muted-foreground uppercase">Atletas com parcial</p><p className="text-xl font-bold">{actualScore?.coverage??0}/12</p></div>
+          </div>
+          <p className="text-xs text-muted-foreground">Pontuação real/parcial segundo os scouts oficiais; integrantes sem pontuação publicada ainda contam como 0. Não inclui banco de reservas ou substituições automáticas.</p>
+          {actualLoading && <p className="text-xs text-primary flex gap-2 items-center"><Loader2 className="h-3 w-3 animate-spin"/> Atualizando pontuação...</p>}
+          {actualScore?.players?.length>0&&(
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+              {actualScore.players.map((p:any)=>{
+                const a=myLineup.find(x=>x.id===p.id);
+                return <div key={p.id} className="rounded border border-border bg-background/50 p-2 flex items-center justify-between gap-2 text-xs">
+                  <span className="min-w-0 truncate">{p.captain?"(C) ":""}{a?.apelido||p.id}</span>
+                  <span className="font-bold tabular-nums">{Number(p.counted).toFixed(2)}</span>
+                </div>;
+              })}
+            </div>
+          )}
+        </Card>
         {/* Strategy Selector */}
         <div className="grid md:grid-cols-3 gap-4 mb-6">
           {(Object.keys(STRATEGIES) as Strategy[]).map((key) => {
@@ -435,8 +479,9 @@ const TeamBuilder = () => {
               {myLineup.map((a) => {
                 const isRecommended = recIds.has(a.id);
                 return (
+                  <div key={a.id} className="space-y-1">
                   <button
-                    key={a.id}
+                    type="button"
                     onClick={() => setSwapping(a)}
                     className="w-full text-left"
                   >
@@ -461,7 +506,7 @@ const TeamBuilder = () => {
                               )}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              {clubes[a.clube_id ?? 0]?.abreviacao ?? "-"} · {a.jogos ?? 0} jogos · Proj. {(a.predictedScore??a.media??0).toFixed(1)} pts
+                              {clubes[a.clube_id ?? 0]?.abreviacao ?? "-"} · {a.jogos ?? 0} jogos · Proj. {Number(a.predictedScore??a.media??0).toFixed(1)} pts
                             </p>
                           </div>
                         </div>
@@ -483,6 +528,14 @@ const TeamBuilder = () => {
                       </div>
                     </Card>
                   </button>
+                  {a.posicao_id !== 6 && (
+                    <button type="button" onClick={()=>setCaptainId(a.id)}
+                      className={cn("text-xs font-bold ml-2 mb-2 px-3 py-1.5 rounded-md border",
+                        captainId===a.id?"text-neon-green border-neon-green/70 bg-neon-green/10":"text-muted-foreground border-border hover:border-primary")}>
+                      {captainId===a.id?"Capitão escolhido (1,5×)":"Definir como capitão"}
+                    </button>
+                  )}
+                  </div>
                 );
               })}
             </div>
