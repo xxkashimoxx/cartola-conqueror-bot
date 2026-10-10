@@ -46,6 +46,11 @@ const STRATEGIES: Record<Strategy, { label: string; desc: string; icon: typeof S
 
 const sumMedia = (l: Atleta[]) => l.reduce((s, a) => s + Number(a.predictedScore ?? a.media ?? 0), 0);
 const sumPreco = (l: Atleta[]) => l.reduce((s, a) => s + Number(a.preco ?? 0), 0);
+const projectedWithCaptain = (lineup:Atleta[],id:number|null=null) => {
+ const eligible=lineup.filter(p=>p.posicao_id!==6);
+ const captain=eligible.find(p=>p.id===id) || [...eligible].sort((a,b)=>Number(b.predictedScore??b.media??0)-Number(a.predictedScore??a.media??0))[0];
+ return sumMedia(lineup)+Math.max(0,Number(captain?.predictedScore??captain?.media??0))*.5;
+};
 
 const TeamBuilder = () => {
   const navigate = useNavigate();
@@ -100,6 +105,10 @@ const TeamBuilder = () => {
         const projected=data.players as Atleta[];
         setRecommended(projected);
         setMyLineup(projected);
+        if(Array.isArray(data.projections)){
+          const projectedMap=new Map<number,any>(data.projections.map((p:any)=>[Number(p.id),p]));
+          setAtletas(previous=>previous.map(a=>({...a,...(projectedMap.get(a.id)||{})})));
+        }
         setCaptainId(data.captainId||null);
         setMarketOpen(!!data.mercadoAberto);
         setOptimizerContext(data.cardsReviewed+" atletas analisados · "+data.teamsUsed+" clubes · formação "+data.formation);
@@ -167,8 +176,8 @@ const TeamBuilder = () => {
       try{
         const result=await fetch("/api/lineups",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},
           body:JSON.stringify({rodada,estrategia:strategy,
-            mine:{ids:myLineup.map(a=>a.id),score:sumMedia(myLineup),price:sumPreco(myLineup)},
-            recommended:{ids:recommended.map(a=>a.id),score:sumMedia(recommended),price:sumPreco(recommended)}})});
+            mine:{ids:myLineup.map(a=>a.id),score:projectedWithCaptain(myLineup,captainId),price:sumPreco(myLineup)},
+            recommended:{ids:recommended.map(a=>a.id),score:projectedWithCaptain(recommended,captainId),price:sumPreco(recommended)}})});
         const data=await result.json();if(!result.ok)throw Error(data.error||"Erro ao salvar");
       }catch(e){error=e instanceof Error?e:new Error("Falha de rede")}
     }
@@ -181,8 +190,8 @@ const TeamBuilder = () => {
   };
 
   // Comparação
-  const myTotal = sumMedia(myLineup);
-  const recTotal = sumMedia(recommended);
+  const myTotal = projectedWithCaptain(myLineup,captainId);
+  const recTotal = projectedWithCaptain(recommended,captainId);
   const diff = myTotal - recTotal;
   const myPrice = sumPreco(myLineup);
   const recIds = new Set(recommended.map((a) => a.id));
@@ -195,8 +204,8 @@ const TeamBuilder = () => {
     if (!swapping) return [] as Atleta[];
     const pos = swapping.posicao_id;
     return atletas
-      .filter((a) => a.posicao_id === pos && a.id !== swapping.id && (a.jogos ?? 0) >= 1)
-      .sort((a, b) => Number(b.media ?? 0) - Number(a.media ?? 0))
+      .filter((a) => a.posicao_id === pos && a.id !== swapping.id && a.status_id === 7 && (a.jogos ?? 0) >= 2)
+      .sort((a, b) => Number(b.predictedScore ?? b.media ?? 0) - Number(a.predictedScore ?? a.media ?? 0))
       .slice(0, 30);
   }, [swapping, atletas]);
 
@@ -405,7 +414,7 @@ const TeamBuilder = () => {
                               )}
                             </h3>
                             <p className="text-sm text-muted-foreground">
-                              {clubes[a.clube_id ?? 0]?.abreviacao ?? "-"} · {a.jogos ?? 0} jogos
+                              {clubes[a.clube_id ?? 0]?.abreviacao ?? "-"} · {a.jogos ?? 0} jogos · Proj. {(a.predictedScore??a.media??0).toFixed(1)} pts
                             </p>
                           </div>
                         </div>
