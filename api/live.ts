@@ -1,6 +1,8 @@
+import {ownerOnly} from "../server/owner.js";
 // Live scoreboard from the Cartola official public API. Read-only and cached briefly.
 export default async function handler(req:any,res:any){
   if(req.method!=="GET")return res.status(405).json({error:"GET obrigatório"});
+  if(!ownerOnly(req,res))return;
   try{
     const [a,b]=await Promise.all([
       fetch("https://api.cartolafc.globo.com/mercado/status",{signal:AbortSignal.timeout(9000)}),
