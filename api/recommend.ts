@@ -32,7 +32,8 @@ function compute(raw:any,points:number[],context:{opponent:string;home:boolean;o
  const recent=points.slice(0,10),sample=recent.length;
  const weights=recent.map((_v,i)=>Math.pow(.80,i));
  const weighted=sample?recent.reduce((t,n,i)=>t+n*weights[i],0)/weights.reduce((t,n)=>t+n,0):average;
- const shrink=clamp(sample/9,.15,.58);
+ const recentCaps:Record<number,number>={1:.06,2:.30,3:.14,4:.30,5:.07,6:.20};
+ const shrink=sample?Math.min(sample/12,recentCaps[raw.posicao_id]??.12):0;
  const blended=average*(1-shrink)+weighted*shrink;
  const mean=sample?recent.reduce((t,n)=>t+n,0)/sample:average;
  const deviation=sample>=3?Math.sqrt(recent.reduce((t,n)=>t+Math.pow(n-mean,2),0)/sample):Math.max(1.4,average*.55);
