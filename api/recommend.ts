@@ -140,7 +140,7 @@ export default async function handler(req:any,res:any){
   const result=optimize(list,budget);
   res.setHeader("Cache-Control","no-store");
   return res.status(200).json({success:true,mode,rodada,budget,mercadoAberto:market[0].status_mercado===1,
-   consultadoEm:new Date().toISOString(),metodologia:"Média da temporada + últimas 10 pontuações ponderadas + amostra + mando + posição do adversário + volatilidade. Otimização por busca em feixe, sob orçamento e 4-3-3. Estratégias com riscos distintos; sem garantia de pontuação.",...result});
+   consultadoEm:new Date().toISOString(),projections:list.map(x=>({id:x.id,predictedScore:x.predictedScore,volatility:x.volatility,opponent:x.opponent,home:x.home,reason:x.reason,confidence:x.confidence})),metodologia:"Média da temporada + últimas 10 pontuações ponderadas + amostra + mando + posição do adversário + volatilidade. Otimização por busca em feixe, sob orçamento e 4-3-3. Estratégias com riscos distintos; sem garantia de pontuação.",...result});
  }catch(e){console.error("Otimização:",e);
   return res.status(422).json({success:false,error:e instanceof Error?e.message:"Não foi possível otimizar"});}
 }
