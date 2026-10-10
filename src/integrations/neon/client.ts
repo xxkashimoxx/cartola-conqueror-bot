@@ -1,12 +1,14 @@
-// Neon backend client (parallel to legacy Supabase client during the refactor).
-// Never put a PostgreSQL connection string or admin secret in VITE_* variables.
+// Neon Auth + Data API client.
+// The PostgreSQL DATABASE_URL belongs only on a protected server runtime.
 import { createClient, SupabaseAuthAdapter } from "@neondatabase/neon-js";
 
-const neonUrl = import.meta.env.VITE_NEON_URL;
-if (!neonUrl) {
-  throw new Error("VITE_NEON_URL is required (HTTPS Neon database base URL).");
+const authUrl = import.meta.env.VITE_NEON_AUTH_URL;
+const dataApiUrl = import.meta.env.VITE_NEON_DATA_API_URL;
+if (!authUrl || !dataApiUrl) {
+  throw new Error("Neon Auth and Data API URLs are required.");
 }
 
-export const neon = createClient(neonUrl, {
-  auth: { adapter: SupabaseAuthAdapter(), allowAnonymous: true },
+export const neon = createClient({
+  auth: { url: authUrl, adapter: SupabaseAuthAdapter(), allowAnonymous: true },
+  dataApi: { url: dataApiUrl },
 });
