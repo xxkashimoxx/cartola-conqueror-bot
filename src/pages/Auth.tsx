@@ -1,148 +1,50 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
-import { Zap } from "lucide-react";
-
-const Auth = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        navigate("/dashboard");
-      }
-    };
-    checkUser();
-  }, [navigate]);
-
-  const handleAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Login bem-sucedido",
-          description: "Modo destruição ativado!",
-        });
-        navigate("/dashboard");
-      } else {
-        const redirectUrl = `${window.location.origin}/`;
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: redirectUrl,
-          },
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Conta criada",
-          description: "Bem-vindo ao Precisão > Clubismo!",
-        });
-        navigate("/dashboard");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PHBhdHRlcm4gaWQ9ImdyaWQiIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHBhdGggZD0iTSAwIDEwIEwgNDAgMTAgTSAxMCAwIEwgMTAgNDAgTSAwIDIwIEwgNDAgMjAgTSAyMCAwIEwgMjAgNDAgTSAwIDMwIEwgNDAgMzAgTSAzMCAwIEwgMzAgNDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iaHNsKDE3MyAxMDAlIDUwJSAvIDAuMSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsbD0idXJsKCNncmlkKSIvPjwvc3ZnPg==')] opacity-10" />
-      
-      <div className="w-full max-w-md relative z-10">
-        <div className="bg-card border-2 border-primary rounded-lg p-8 shadow-neon">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-black text-neon-cyan mb-2 uppercase animate-pulse-neon">
-              Precisão &gt; Clubismo
-            </h1>
-            <p className="text-muted-foreground">
-              {isLogin ? "Entre para dominar" : "Registre-se para destruir"}
-            </p>
-          </div>
-
-          <form onSubmit={handleAuth} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-foreground font-bold uppercase text-sm">
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="bg-background border-border focus:border-primary"
-                placeholder="seu@email.com"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-foreground font-bold uppercase text-sm">
-                Senha
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-background border-border focus:border-primary"
-                placeholder="••••••••"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-primary hover:bg-primary/80 text-primary-foreground font-bold uppercase shadow-neon"
-              size="lg"
-            >
-              <Zap className="mr-2 h-5 w-5" />
-              {loading ? "Processando..." : isLogin ? "Entrar" : "Registrar"}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-primary hover:text-primary/80 font-semibold"
-            >
-              {isLogin
-                ? "Não tem conta? Registre-se"
-                : "Já tem conta? Entre"}
-            </button>
-          </div>
-        </div>
-      </div>
+import {useEffect,useState,type FormEvent} from "react";
+import {useNavigate} from "react-router-dom";
+import {Button} from "@/components/ui/button";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {useAuth} from "@/hooks/useAuth";
+import {LockKeyhole,Eye,EyeOff,ShieldCheck} from "lucide-react";
+const Auth=()=>{
+ const [password,setPassword]=useState(""),[busy,setBusy]=useState(false),[error,setError]=useState(""),[show,setShow]=useState(false);
+ const {user,loading,refresh}=useAuth(),navigate=useNavigate();
+ useEffect(()=>{if(!loading&&user)navigate("/dashboard",{replace:true})},[user,loading,navigate]);
+ async function submit(e:FormEvent){
+  e.preventDefault();setBusy(true);setError("");
+  try{
+   const r=await fetch("/api/access",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({password})});
+   const data=await r.json();if(!r.ok)throw Error(data.error||"Falha na autenticação");
+   setPassword("");
+   if(!await refresh())throw Error("Sessão não confirmada. Tente novamente.");
+   navigate("/dashboard",{replace:true});
+  }catch(e){setError(e instanceof Error?e.message:"Erro no login")}
+  finally{setBusy(false)}
+ }
+ return <div className="min-h-screen bg-background flex items-center justify-center p-4">
+  <div className="w-full max-w-md bg-card border-2 border-primary/70 rounded-xl p-7 md:p-9 shadow-neon">
+   <div className="text-center mb-8">
+    <div className="mx-auto w-14 h-14 flex items-center justify-center rounded-xl bg-primary/15 border border-primary/40 mb-4"><ShieldCheck className="h-8 w-8 text-neon-cyan"/></div>
+    <h1 className="text-3xl md:text-4xl font-black text-neon-cyan tracking-tight">Precisão &gt; Clubismo</h1>
+    <p className="mt-3 text-muted-foreground">Acesso privado · Cartola Conqueror 2026</p>
+   </div>
+   <form onSubmit={submit} className="space-y-5">
+    <div className="space-y-2">
+     <Label htmlFor="owner-password" className="text-foreground font-bold">Senha de acesso</Label>
+     <div className="relative">
+      <Input autoFocus id="owner-password" type={show?"text":"password"} autoComplete="current-password" value={password} required minLength={6} maxLength={256}
+       onChange={e=>setPassword(e.target.value)} placeholder="Digite sua senha" className="pr-12 h-12 bg-background"/>
+      <button type="button" aria-label={show?"Ocultar senha":"Mostrar senha"} onClick={()=>setShow(!show)} className="absolute right-3 top-3 text-muted-foreground hover:text-foreground">
+       {show?<EyeOff className="h-5 w-5"/>:<Eye className="h-5 w-5"/>}
+      </button>
+     </div>
     </div>
-  );
+    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+    <Button className="w-full h-12 bg-primary font-bold text-primary-foreground" disabled={busy||loading} type="submit">
+      <LockKeyhole className="mr-2 h-4 w-4"/>{busy?"Verificando...":"Entrar no painel"}
+    </Button>
+   </form>
+   <p className="text-center text-xs text-muted-foreground mt-6">Login exclusivo · Sem cadastro público · Sessão protegida</p>
+  </div>
+ </div>
 };
-
 export default Auth;
