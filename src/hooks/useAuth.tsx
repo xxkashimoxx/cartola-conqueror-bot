@@ -1,109 +1,24 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
-
-type AppRole = "admin" | "user";
-
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  role: AppRole | null;
-  isAdmin: boolean;
-  loading: boolean;
-  signOut: () => Promise<void>;
+import {createContext,useCallback,useContext,useEffect,useMemo,useState,type ReactNode} from "react";
+type AppUser={id:string;role:"admin"};
+type AppContext={user:AppUser|null;session:{user:AppUser}|null;role:"admin"|null;isAdmin:boolean;loading:boolean;refresh:()=>Promise<boolean>;signOut:()=>Promise<void>};
+const Context=createContext<AppContext|null>(null);
+export function AuthProvider({children}:{children:ReactNode}){
+ const [user,setUser]=useState<AppUser|null>(null),[loading,setLoading]=useState(true);
+ const refresh=useCallback(async()=>{
+  try{
+   const r=await fetch("/api/access",{method:"GET",credentials:"same-origin",cache:"no-store"});
+   const data=await r.json();
+   const owner=r.ok&&data.authenticated?data.user:null;
+   setUser(owner);return !!owner;
+  }catch{setUser(null);return false;}
+  finally{setLoading(false);}
+ },[]);
+ useEffect(()=>{void refresh();const fn=()=>{void refresh()};window.addEventListener("cartola-auth-changed",fn);return()=>window.removeEventListener("cartola-auth-changed",fn)},[refresh]);
+ const signOut=useCallback(async()=>{
+  await fetch("/api/access",{method:"DELETE",credentials:"same-origin",headers:{"Content-Type":"application/json"}});
+  setUser(null);
+ },[]);
+ const value=useMemo(()=>({user,session:user?{user}:null,role:user?"admin" as const:null,isAdmin:!!user,loading,refresh,signOut}),[user,loading,refresh,signOut]);
+ return <Context.Provider value={value}>{children}</Context.Provider>;
 }
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [role, setRole] = useState<AppRole | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Defer role fetch with setTimeout to prevent deadlock
-        if (session?.user) {
-          setTimeout(() => {
-            fetchUserRole(session.user.id);
-          }, 0);
-        } else {
-          setRole(null);
-          setLoading(false);
-        }
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserRole(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUserRole = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error fetching role:", error);
-        setRole("user");
-      } else {
-        setRole((data?.role as AppRole) || "user");
-      }
-    } catch (err) {
-      console.error("Error in fetchUserRole:", err);
-      setRole("user");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setSession(null);
-    setRole(null);
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        role,
-        isAdmin: role === "admin",
-        loading,
-        signOut,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
+export function useAuth(){const x=useContext(Context);if(!x)throw Error("AuthProvider ausente");return x;}
