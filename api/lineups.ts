@@ -24,11 +24,11 @@ export default async function handler(req:any,res:any){
   if(!valid(mine)||!valid(rec))return res.status(400).json({error:"Escalação deve ter 11 atletas e técnico, sem duplicações"});
   const list=[{tipo:"minha",data:mine},{tipo:"recomendada",data:rec}];
   for(const x of list){
-   await sql.query(\`insert into public.escalacoes_usuario(user_id,rodada,tipo,estrategia,atleta_ids,pontos_esperados,valor_total)
+   await sql.query(`insert into public.escalacoes_usuario(user_id,rodada,tipo,estrategia,atleta_ids,pontos_esperados,valor_total)
     values($1,$2,$3,$4,$5::integer[],$6,$7)
     on conflict(user_id,rodada,tipo) do update set estrategia=excluded.estrategia,
     atleta_ids=excluded.atleta_ids,pontos_esperados=excluded.pontos_esperados,
-    valor_total=excluded.valor_total,updated_at=now()\`,
+    valor_total=excluded.valor_total,updated_at=now()`,
     [OWNER_ID,rodada,x.tipo,estrategia,x.data.ids,numeric(x.data.score),numeric(x.data.price)]);
   }
   return res.status(200).json({success:true,rodada});
