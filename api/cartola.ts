@@ -213,15 +213,6 @@ export default async function handler(req:any,res:any) {
   const name=String(req.query?.name||"");
   if(req.method!=="GET"&&req.method!=="POST") return json(res,405,{error:"Método inválido"});
   try {
-    // Preview-only bootstrapping of a new Neon database. REMOVE before production release.
-    if(name==="preview-bootstrap") {
-      if(process.env.VERCEL_ENV!=="preview" || process.env.VERCEL_GIT_COMMIT_REF!=="feature/neon-backend")
-        return json(res,404,{error:"Not found"});
-      if(req.method!=="GET")return json(res,405,{error:"GET only"});
-      const result=await syncMain({});
-      const partials=await syncPartial();
-      return json(res,200,{...result,partials});
-    }
     if(name==="status-temporada") {
       const m=await cartola("mercado/status");
       return json(res,200,{success:true,temporada:m.temporada,rodada:m.rodada_atual,rodadaFinal:m.rodada_final || 38,mercado:m.status_mercado,bolaRolando:!!m.bola_rolando,fechamento:m.fechamento,fonte:"Cartola FC - Globo",consultadoEm:new Date().toISOString()});
