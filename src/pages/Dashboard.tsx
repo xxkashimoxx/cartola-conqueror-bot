@@ -14,6 +14,7 @@ import NewsCards from "@/components/NewsCards";
 import LivePointsBadge from "@/components/LivePointsBadge";
 import { useLiveScores } from "@/hooks/useLiveScores";
 import SeasonStatusBanner from "@/components/SeasonStatusBanner";
+import JogosDaRodada from "@/components/JogosDaRodada";
 
 interface Player {
   id: number;
@@ -245,6 +246,7 @@ const Dashboard = () => {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8 space-y-8">
         <SeasonStatusBanner />
+        <JogosDaRodada />
         <ResumoRodada />
 
         <NewsCards limit={6} />
