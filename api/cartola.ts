@@ -173,13 +173,22 @@ async function syncMain(body: any) {
           clubIds.has(Number(p.clube_casa_id)) && clubIds.has(Number(p.clube_visitante_id)))
         .map((p:any)=>({rodada:round,time_casa_id:Number(p.clube_casa_id),
           time_fora_id:Number(p.clube_visitante_id),
-          data_partida:p.partida_data?new Date(String(p.partida_data).replace(" ","T")+"-03:00").toISOString():null}));
+          data_partida:p.partida_data?new Date(String(p.partida_data).replace(" ","T")+"-03:00").toISOString():null,
+          placar_casa:p.placar_oficial_mandante??null,placar_fora:p.placar_oficial_visitante??null,
+          status_jogo:p.status_transmissao_tr||null,posicao_casa:p.clube_casa_posicao??null,
+          posicao_fora:p.clube_visitante_posicao??null,estadio:p.local||null,partida_cartola_id:p.partida_id??null}));
       if (!rows.length) continue;
       await sql.query(`
-        insert into public.partidas(rodada,time_casa_id,time_fora_id,data_partida)
-        select rodada,time_casa_id,time_fora_id,data_partida
-        from jsonb_to_recordset($1::jsonb) as p(rodada int,time_casa_id int,time_fora_id int,data_partida timestamptz)
-        on conflict(rodada,time_casa_id,time_fora_id) do update set data_partida=excluded.data_partida,updated_at=now()
+        insert into public.partidas(rodada,time_casa_id,time_fora_id,data_partida,
+          placar_casa,placar_fora,status_jogo,posicao_casa,posicao_fora,estadio,partida_cartola_id)
+        select rodada,time_casa_id,time_fora_id,data_partida,
+          placar_casa,placar_fora,status_jogo,posicao_casa,posicao_fora,estadio,partida_cartola_id
+        from jsonb_to_recordset($1::jsonb) as p(rodada int,time_casa_id int,time_fora_id int,data_partida timestamptz,
+          placar_casa int,placar_fora int,status_jogo text,posicao_casa int,posicao_fora int,estadio text,partida_cartola_id int)
+        on conflict(rodada,time_casa_id,time_fora_id) do update set data_partida=excluded.data_partida,
+          placar_casa=excluded.placar_casa,placar_fora=excluded.placar_fora,status_jogo=excluded.status_jogo,
+          posicao_casa=excluded.posicao_casa,posicao_fora=excluded.posicao_fora,estadio=excluded.estadio,
+          partida_cartola_id=excluded.partida_cartola_id,updated_at=now()
       `,[JSON.stringify(rows)]);
       matchesSaved+=rows.length;
     }catch(err){console.error("Falha nas partidas "+round,err);}
