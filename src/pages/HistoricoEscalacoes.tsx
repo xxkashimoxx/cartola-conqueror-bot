@@ -27,6 +27,8 @@ interface EscalacaoRow {
   pontos_esperados: number | null;
   valor_total: number | null;
   updated_at: string;
+  captain_id: number | null;
+  score?: {total:number|null;status:string;source:string;coverage:number;captainBonus:number|null;players:{id:number;points:number}[]};
 }
 
 interface RodadaResumo {
@@ -40,6 +42,9 @@ interface RodadaResumo {
   recReal: number | null;
   trocas: number;
   updated_at: string;
+  currentStatus?: string|null;
+  source?: string|null;
+  captainMissing?: boolean;
 }
 
 const HistoricoEscalacoes = () => {
@@ -52,49 +57,37 @@ const HistoricoEscalacoes = () => {
   const [atletasMap, setAtletasMap] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    if (!user) {
-      /* auth desativado */
-      return;
-    }
-    (async () => {
-      setLoading(true);
-      const response=await fetch("/api/lineups",{credentials:"same-origin",cache:"no-store"});
-      if(!response.ok){setRows([]);setLoading(false);return;}
-      const payload=await response.json();
-      const list = (payload.rows ?? []) as EscalacaoRow[];
-      setRows(list);
-
-      // Pega pontuações reais
-      const allIds = new Set<number>();
-      const rodadas = new Set<number>();
-      list.forEach((r) => {
-        rodadas.add(r.rodada);
-        r.atleta_ids?.forEach((id) => allIds.add(id));
-      });
-
-      if (allIds.size && rodadas.size) {
-        const { data: pts } = await supabase
-          .from("atleta_pontuacoes")
-          .select("atleta_id,rodada,pontos")
-          .in("atleta_id", Array.from(allIds))
-          .in("rodada", Array.from(rodadas));
-        const map: Record<string, number> = {};
-        (pts ?? []).forEach((p: any) => {
-          map[`${p.atleta_id}-${p.rodada}`] = Number(p.pontos ?? 0);
-        });
-        setPontosPorRodada(map);
-
-        const { data: ats } = await supabase
-          .from("atletas")
-          .select("id,apelido")
-          .in("id", Array.from(allIds));
-        const am: Record<number, string> = {};
-        (ats ?? []).forEach((a: any) => (am[a.id] = a.apelido));
-        setAtletasMap(am);
-      }
-      setLoading(false);
-    })();
-  }, [user, navigate]);
+    if(!user)return;
+    let active=true;
+    const reload=async()=>{
+      try{
+        const res=await fetch("/api/lineups",{credentials:"same-origin",cache:"no-store"});
+        if(!res.ok)throw Error("Sem acesso ao histórico");
+        const data=await res.json();
+        if(!active)return;
+        const list=(data.rows||[]) as EscalacaoRow[];
+        setRows(list);
+        const points:Record<string,number>={};
+        for(const r of list){
+          for(const p of r.score?.players||[])points[p.id+"-"+r.rodada]=Number(p.points);
+        }
+        setPontosPorRodada(points);
+        const ids=[...new Set(list.flatMap(r=>r.atleta_ids||[]))];
+        if(ids.length){
+          const {data:players}=await supabase.from("atletas").select("id,apelido").in("id",ids.slice(0,250));
+          if(active){
+            const names:Record<number,string>={};
+            for(const p of players||[])names[p.id]=p.apelido;
+            setAtletasMap(names);
+          }
+        }
+      }catch(e){console.warn("Histórico temporariamente indisponível",e);}
+      finally{if(active)setLoading(false);}
+    };
+    void reload();
+    const poll=window.setInterval(()=>{if(document.visibilityState==="visible")void reload()},35000);
+    return()=>{active=false;window.clearInterval(poll)};
+  },[user?.id]);
 
   const resumos = useMemo<RodadaResumo[]>(() => {
     const byRodada = new Map<number, RodadaResumo>();
@@ -110,13 +103,21 @@ const HistoricoEscalacoes = () => {
         recReal: null,
         trocas: 0,
         updated_at: r.updated_at,
+        currentStatus: null,
+        source: null,
+        captainMissing: false,
       };
       if (r.tipo === "minha") {
         existing.minhaIds = r.atleta_ids ?? [];
         existing.minhaEsperado = Number(r.pontos_esperados ?? 0);
+        existing.minhaReal = r.score?.total ?? null;
+        existing.currentStatus = r.score?.status || null;
+        existing.source = r.score?.source || null;
+        existing.captainMissing = r.captain_id==null;
       } else if (r.tipo === "recomendada") {
         existing.recIds = r.atleta_ids ?? [];
         existing.recEsperado = Number(r.pontos_esperados ?? 0);
+        existing.recReal = r.score?.total ?? null;
       }
       existing.estrategia = existing.estrategia ?? r.estrategia;
       byRodada.set(r.rodada, existing);
@@ -124,23 +125,9 @@ const HistoricoEscalacoes = () => {
 
     const result: RodadaResumo[] = [];
     for (const r of byRodada.values()) {
-      const myReal = r.minhaIds.length
-        ? r.minhaIds.reduce((s, id) => s + (pontosPorRodada[`${id}-${r.rodada}`] ?? 0), 0)
-        : null;
-      const recReal = r.recIds.length
-        ? r.recIds.reduce((s, id) => s + (pontosPorRodada[`${id}-${r.rodada}`] ?? 0), 0)
-        : null;
-      const recSet = new Set(r.recIds);
-      const trocas = r.minhaIds.filter((id) => !recSet.has(id)).length;
-      // Só conta como "real" se houver alguma pontuação registrada
-      const hasReal = r.minhaIds.some((id) => pontosPorRodada[`${id}-${r.rodada}`] !== undefined)
-        || r.recIds.some((id) => pontosPorRodada[`${id}-${r.rodada}`] !== undefined);
-      result.push({
-        ...r,
-        trocas,
-        minhaReal: hasReal && myReal !== null ? Number(myReal.toFixed(2)) : null,
-        recReal: hasReal && recReal !== null ? Number(recReal.toFixed(2)) : null,
-      });
+      const recSet=new Set(r.recIds);
+      const trocas=r.minhaIds.filter(id=>!recSet.has(id)).length;
+      result.push({...r,trocas});
     }
     return result.sort((a, b) => a.rodada - b.rodada);
   }, [rows, pontosPorRodada]);
@@ -324,7 +311,7 @@ const HistoricoEscalacoes = () => {
                               usaReal ? "border-neon-green/50 text-neon-green" : "border-muted text-muted-foreground"
                             )}
                           >
-                            {usaReal ? "Pontuação real" : "Projeção"}
+                            {usaReal ? (r.currentStatus==="encerrada"?"Pontuação oficial":"Parcial ao vivo") : "Projeção"}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-4">
@@ -353,6 +340,8 @@ const HistoricoEscalacoes = () => {
                         </div>
                       </div>
 
+                      {r.source && <p className="text-xs text-muted-foreground mt-2">Fonte: {r.source} · Rodada {r.rodada}</p>}
+                      {r.captainMissing && <p className="text-xs text-amber-500 mt-1">Capitão não registrado nesta escalação antiga: o total mostrado não contém o bônus de 50%. Selecione o capitão em Meu Time e salve.</p>}
                       {/* Detalhamento de trocas */}
                       {r.trocas > 0 && (
                         <div className="pt-3 border-t border-border">
