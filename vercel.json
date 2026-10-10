@@ -24,6 +24,10 @@
     {
       "path": "/api/cron?task=full",
       "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron?task=partial",
+      "schedule": "0 3 * * *"
     }
   ]
 }
