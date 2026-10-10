@@ -1,4 +1,4 @@
-import cartolaHandler from "./cartola";
+import cartolaHandler from "./cartola.js";
 export default async function handler(req:any,res:any) {
   if(req.method!=="GET")return res.status(405).json({error:"GET obrigatório"});
   if(!process.env.CRON_SECRET || req.headers.authorization!=="Bearer "+process.env.CRON_SECRET)
