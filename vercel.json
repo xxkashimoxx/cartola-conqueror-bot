@@ -12,6 +12,15 @@
     },
     "api/live.ts": {
       "maxDuration": 30
+    },
+    "api/recommend.ts": {
+      "maxDuration": 90
+    },
+    "api/access.ts": {
+      "maxDuration": 30
+    },
+    "api/lineups.ts": {
+      "maxDuration": 30
     }
   },
   "rewrites": [
