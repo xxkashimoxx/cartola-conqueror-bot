@@ -76,7 +76,7 @@ const ResumoRodada = () => {
             </div>
             <div>
               <div className="text-xs text-muted-foreground uppercase tracking-wider font-bold">
-                Resumo IA · Rodada {resumo.rodada}
+                Resumo estatístico · Rodada {resumo.rodada}
               </div>
               <h3 className="text-foreground font-black text-lg md:text-xl leading-tight mt-1">
                 {resumo.manchete}
