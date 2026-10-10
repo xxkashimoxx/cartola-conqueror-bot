@@ -63,19 +63,7 @@ const NewsCards = ({
     if (!silent) setRefreshing(true);
 
     try {
-      // Refresh manual força bypass do TTL (?refresh=1 no edge function)
-      const invocation = force
-        ? fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/news-brasileirao?refresh=1`,
-            {
-              method: "POST",
-              headers: {
-                apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-                Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              },
-            },
-          ).then((r) => r.json()).then((d) => ({ data: d, error: null }))
-        : supabase.functions.invoke("news-brasileirao");
+      const invocation = supabase.functions.invoke("news-brasileirao", { body: force ? { refresh: 1 } : {} });
 
       const aborted = new Promise<never>((_, reject) => {
         controller.signal.addEventListener("abort", () => reject(new Error("aborted")));
