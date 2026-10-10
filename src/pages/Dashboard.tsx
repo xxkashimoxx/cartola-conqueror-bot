@@ -13,6 +13,7 @@ import SyncNowButton from "@/components/SyncNowButton";
 import NewsCards from "@/components/NewsCards";
 import LivePointsBadge from "@/components/LivePointsBadge";
 import { useLiveScores } from "@/hooks/useLiveScores";
+import SeasonStatusBanner from "@/components/SeasonStatusBanner";
 
 interface Player {
   id: number;
@@ -125,10 +126,8 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchPlayers();
-    }
-  }, [user]);
+    void fetchPlayers();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -160,11 +159,11 @@ const Dashboard = () => {
               Precisão &gt; Clubismo
             </h1>
             <div className="flex gap-2 flex-wrap justify-center">
-              <SyncNowButton
+              {isAdmin && <SyncNowButton
                 className="border-2 border-neon-cyan hover:bg-card"
                 label="Sincronizar agora"
                 onDone={fetchPlayers}
-              />
+              />}
               <Button
                 onClick={() => navigate("/confrontos")}
                 variant="outline"
@@ -230,13 +229,13 @@ const Dashboard = () => {
                   Admin
                 </Button>
               )}
-              <Button
+              {user && <Button
                 onClick={handleLogout}
                 variant="destructive"
                 className="border-2 border-destructive shadow-danger"
               >
                 Sair
-              </Button>
+              </Button>}
             </div>
           </div>
         </div>
@@ -245,9 +244,8 @@ const Dashboard = () => {
       {/* Main Content */}
       {/* Main Content */}
       <div className="container mx-auto px-4 py-8 space-y-8">
-        {user && (
-          <ResumoRodada />
-        )}
+        <SeasonStatusBanner />
+        <ResumoRodada />
 
         <NewsCards limit={6} />
 
