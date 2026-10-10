@@ -1,10 +1,8 @@
 import {hasOwnerSession} from "../server/owner.js";
 // Server-only Cartola API. Requires DATABASE_URL on Vercel (never VITE_DATABASE_URL).
 import { neon } from "@neondatabase/serverless";
-import { createRemoteJWKSet, jwtVerify } from "jose";
 
 const DATABASE_URL = process.env.DATABASE_URL;
-const JWKS_URL = process.env.NEON_AUTH_JWKS_URL;
 function db() {
   if (!DATABASE_URL) throw new Error("DATABASE_URL não configurada na Vercel");
   return neon(DATABASE_URL);
@@ -26,25 +24,8 @@ async function cartola(path: string) {
   return response.json();
 }
 async function authorizeAdmin(req: any) {
-  if (hasOwnerSession(req)) return true;
-  const secret = process.env.CRON_SECRET;
-  if (secret && String(req.headers.authorization || "") === "Bearer " + secret) return true;
-  if (!JWKS_URL) throw new Error("NEON_AUTH_JWKS_URL não configurada");
-  const match = /^Bearer (.+)$/i.exec(String(req.headers.authorization || ""));
-  if (!match) return false;
-  try {
-    const { payload } = await jwtVerify(match[1], createRemoteJWKSet(new URL(JWKS_URL)), {
-      algorithms: ["ES256", "RS256", "EdDSA"],
-    });
-    if (!payload.sub) return false;
-    const rows = await db().query(
-      "select 1 from public.user_roles where user_id::text=$1 and role='admin' limit 1",
-      [payload.sub],
-    );
-    return rows.length > 0;
-  } catch {
-    return false;
-  }
+  const cronSecret = process.env.CRON_SECRET;
+  return hasOwnerSession(req) || (!!cronSecret && String(req.headers.authorization||"")==="Bearer "+cronSecret);
 }
 async function topPlayers(limit: number, position?: number) {
   const rows = await db().query(`
