@@ -1,3 +1,4 @@
+import {hasOwnerSession} from "../server/owner.js";
 // Server-only Cartola API. Requires DATABASE_URL on Vercel (never VITE_DATABASE_URL).
 import { neon } from "@neondatabase/serverless";
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -25,6 +26,7 @@ async function cartola(path: string) {
   return response.json();
 }
 async function authorizeAdmin(req: any) {
+  if (hasOwnerSession(req)) return true;
   const secret = process.env.CRON_SECRET;
   if (secret && String(req.headers.authorization || "") === "Bearer " + secret) return true;
   if (!JWKS_URL) throw new Error("NEON_AUTH_JWKS_URL não configurada");
@@ -211,6 +213,8 @@ async function syncPartial() {
 export default async function handler(req:any,res:any) {
   if(req.method==="OPTIONS") return res.status(204).end();
   const name=String(req.query?.name||"");
+  const authorizedCron = (name==="sync-cartola-data" || name==="sync-parciais") && !!process.env.CRON_SECRET && req.headers.authorization==="Bearer "+process.env.CRON_SECRET;
+  if(!authorizedCron && !hasOwnerSession(req)) return json(res,401,{success:false,error:"Faça login para continuar."});
   if(req.method!=="GET"&&req.method!=="POST") return json(res,405,{error:"Método inválido"});
   try {
     if(name==="status-temporada") {
