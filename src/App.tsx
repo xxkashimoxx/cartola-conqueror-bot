@@ -2,10 +2,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import Landing from "./pages/Landing";
+
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Compare from "./pages/Compare";
@@ -32,17 +32,17 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<Navigate to="/auth" replace />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/compare" element={<Compare />} />
-            <Route path="/team-builder" element={<TeamBuilder />} />
-            <Route path="/historico" element={<HistoricoEscalacoes />} />
-            <Route path="/confrontos" element={<Confrontos />} />
-            <Route path="/ausencias" element={<RadarAusencias />} />
-            <Route path="/simulador" element={<Simulador />} />
-            <Route path="/mercado" element={<MercadoInteligente />} />
-            <Route path="/oportunidades" element={<Oportunidades />} />
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/compare" element={<ProtectedRoute><Compare /></ProtectedRoute>} />
+            <Route path="/team-builder" element={<ProtectedRoute><TeamBuilder /></ProtectedRoute>} />
+            <Route path="/historico" element={<ProtectedRoute><HistoricoEscalacoes /></ProtectedRoute>} />
+            <Route path="/confrontos" element={<ProtectedRoute><Confrontos /></ProtectedRoute>} />
+            <Route path="/ausencias" element={<ProtectedRoute><RadarAusencias /></ProtectedRoute>} />
+            <Route path="/simulador" element={<ProtectedRoute><Simulador /></ProtectedRoute>} />
+            <Route path="/mercado" element={<ProtectedRoute><MercadoInteligente /></ProtectedRoute>} />
+            <Route path="/oportunidades" element={<ProtectedRoute><Oportunidades /></ProtectedRoute>} />
             
             {/* Admin routes */}
             <Route
