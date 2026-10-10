@@ -22,6 +22,11 @@ interface Atleta {
   media: number | null;
   jogos: number | null;
   status_id: number | null;
+  predictedScore?: number;
+  volatility?: number;
+  reason?: string;
+  opponent?: string | null;
+  confidence?: string;
 }
 
 interface Clube {
@@ -31,7 +36,7 @@ interface Clube {
 
 const POS_LABEL: Record<number, string> = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" };
 const FORMATION: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 3, 6: 1 };
-const BUDGET = 140;
+
 
 const STRATEGIES: Record<Strategy, { label: string; desc: string; icon: typeof Shield; color: string }> = {
   balanceada: { label: "Balanceada", desc: "Equilíbrio entre risco e segurança", icon: Scale, color: "text-neon-cyan" },
@@ -39,65 +44,7 @@ const STRATEGIES: Record<Strategy, { label: string; desc: string; icon: typeof S
   defensiva: { label: "Defensiva", desc: "Pontuação segura e consistente", icon: Shield, color: "text-neon-green" },
 };
 
-function scoreAtleta(a: Atleta, strategy: Strategy): number {
-  const media = Number(a.media ?? 0);
-  const preco = Number(a.preco ?? 0);
-  const jogos = Number(a.jogos ?? 0);
-  const pos = a.posicao_id ?? 0;
-  if (strategy === "ofensiva") {
-    const boost = pos === 5 ? 1.35 : pos === 4 ? 1.15 : 1;
-    return (media * boost) + (preco * 0.18);
-  }
-  if (strategy === "defensiva") {
-    const boost = pos === 1 ? 1.25 : pos === 3 ? 1.2 : pos === 2 ? 1.15 : 1;
-    return (media * boost) + Math.min(jogos, 15) * 0.18 - preco * 0.03;
-  }
-  return media + Math.min(jogos, 15) * 0.08;
-}
-
-function buildLineup(atletas: Atleta[], strategy: Strategy): Atleta[] {
-  const provaveis = atletas.filter(
-    (a) => (a.jogos ?? 0) >= 2 && (a.status_id === 7 || a.status_id === null || a.status_id === 0)
-  );
-  const byPos: Record<number, Atleta[]> = {};
-  for (const a of provaveis) {
-    const p = a.posicao_id ?? 0;
-    if (!FORMATION[p]) continue;
-    (byPos[p] ||= []).push(a);
-  }
-  for (const p in byPos) {
-    byPos[+p].sort((x, y) => scoreAtleta(y, strategy) - scoreAtleta(x, strategy));
-  }
-  const picked: Atleta[] = [];
-  for (const pos of Object.keys(FORMATION).map(Number)) {
-    const need = FORMATION[pos];
-    const pool = byPos[pos] || [];
-    picked.push(...pool.slice(0, need));
-  }
-  let total = picked.reduce((s, a) => s + Number(a.preco ?? 0), 0);
-  let guard = 0;
-  while (total > BUDGET && guard < 50) {
-    const sortedByCost = [...picked].sort((a, b) => Number(b.preco ?? 0) - Number(a.preco ?? 0));
-    let swapped = false;
-    for (const expensive of sortedByCost) {
-      const pos = expensive.posicao_id ?? 0;
-      const pool = byPos[pos] || [];
-      const idx = pool.findIndex((x) => x.id === expensive.id);
-      const next = pool.slice(idx + 1).find((cand) => !picked.some((p) => p.id === cand.id));
-      if (next && Number(next.preco ?? 0) < Number(expensive.preco ?? 0)) {
-        picked[picked.indexOf(expensive)] = next;
-        total = picked.reduce((s, a) => s + Number(a.preco ?? 0), 0);
-        swapped = true;
-        break;
-      }
-    }
-    if (!swapped) break;
-    guard++;
-  }
-  return picked;
-}
-
-const sumMedia = (l: Atleta[]) => l.reduce((s, a) => s + Number(a.media ?? 0), 0);
+const sumMedia = (l: Atleta[]) => l.reduce((s, a) => s + Number(a.predictedScore ?? a.media ?? 0), 0);
 const sumPreco = (l: Atleta[]) => l.reduce((s, a) => s + Number(a.preco ?? 0), 0);
 
 const TeamBuilder = () => {
@@ -113,6 +60,13 @@ const TeamBuilder = () => {
   const [myLineup, setMyLineup] = useState<Atleta[]>([]);
   const [swapping, setSwapping] = useState<Atleta | null>(null);
   const [saving, setSaving] = useState(false);
+  const [budget, setBudget] = useState(100);
+  const [recommended,setRecommended] = useState<Atleta[]>([]);
+  const [optimizing,setOptimizing]=useState(false);
+  const [optimizerError,setOptimizerError]=useState<string|null>(null);
+  const [captainId,setCaptainId]=useState<number|null>(null);
+  const [marketOpen,setMarketOpen]=useState(false);
+  const [optimizerContext,setOptimizerContext]=useState("");
 
   useEffect(() => {
     (async () => {
@@ -131,7 +85,31 @@ const TeamBuilder = () => {
     })();
   }, []);
 
-  const recommended = useMemo(() => buildLineup(atletas, strategy), [atletas, strategy]);
+  // Server-side optimizer: current opponent + recent historic points + constrained squad selection.
+  useEffect(() => {
+    if(!rodada||!atletas.length)return;
+    const controller=new AbortController();
+    let alive=true;
+    (async()=>{
+      setOptimizing(true);setOptimizerError(null);
+      try{
+        const response=await fetch("/api/recommend?mode="+strategy+"&budget="+budget,{signal:controller.signal,credentials:"same-origin",cache:"no-store"});
+        const data=await response.json();
+        if(!response.ok)throw Error(data.error||"Erro no algoritmo");
+        if(!alive)return;
+        const projected=data.players as Atleta[];
+        setRecommended(projected);
+        setMyLineup(projected);
+        setCaptainId(data.captainId||null);
+        setMarketOpen(!!data.mercadoAberto);
+        setOptimizerContext(data.cardsReviewed+" atletas analisados · "+data.teamsUsed+" clubes · formação "+data.formation);
+      }catch(error){
+        if(!alive||controller.signal.aborted)return;
+        setOptimizerError(error instanceof Error?error.message:"Erro ao otimizar");
+      }finally{if(alive)setOptimizing(false);}
+    })();
+    return()=>{alive=false;controller.abort()};
+  },[rodada,atletas.length,strategy,budget]);
 
   // Sincroniza minha escalação quando muda recomendada (primeira vez ou reset)
   useEffect(() => {
@@ -140,24 +118,24 @@ const TeamBuilder = () => {
     }
   }, [recommended]);
 
-  // Carregar escalação salva do usuário, se existir
-  useEffect(() => {
-    if (!user || !rodada || atletas.length === 0) return;
-    (async () => {
-      const { data } = await supabase
-        .from("escalacoes_usuario")
-        .select("atleta_ids")
-        .eq("user_id", user.id)
-        .eq("rodada", rodada)
-        .eq("tipo", "minha")
-        .maybeSingle();
-      if (data?.atleta_ids?.length) {
-        const map = new Map(atletas.map((a) => [a.id, a]));
-        const saved = (data.atleta_ids as number[]).map((id) => map.get(id)).filter(Boolean) as Atleta[];
-        if (saved.length) setMyLineup(saved);
-      }
-    })();
-  }, [user, rodada, atletas]);
+  // Recover the private owner's previously saved lineup.
+  useEffect(()=>{
+    if(!user||!rodada||!atletas.length)return;
+    let alive=true;
+    (async()=>{
+      try{
+        const res=await fetch("/api/lineups?rodada="+rodada,{credentials:"same-origin"});
+        if(!res.ok)return;
+        const data=await res.json();
+        const saved=(data.rows||[]).find((row:any)=>row.tipo==="minha");
+        if(saved?.atleta_ids?.length===12&&alive){
+          const map=new Map(atletas.map(a=>[a.id,a]));
+          const lineup=saved.atleta_ids.map((id:number)=>map.get(id)).filter(Boolean);
+          if(lineup.length===12)setMyLineup(lineup);
+        }
+      }catch(e){console.warn("Histórico indisponível",e)}
+    })();return()=>{alive=false};
+  },[user,rodada,atletas]);
 
   const handleSwap = (newAtleta: Atleta) => {
     if (!swapping) return;
@@ -180,27 +158,20 @@ const TeamBuilder = () => {
       return;
     }
     setSaving(true);
-    const myPayload = {
-      user_id: user.id,
-      rodada,
-      tipo: "minha" as const,
-      estrategia: strategy,
-      atleta_ids: myLineup.map((a) => a.id),
-      pontos_esperados: Number(sumMedia(myLineup).toFixed(2)),
-      valor_total: Number(sumPreco(myLineup).toFixed(2)),
-    };
-    const recPayload = {
-      user_id: user.id,
-      rodada,
-      tipo: "recomendada" as const,
-      estrategia: strategy,
-      atleta_ids: recommended.map((a) => a.id),
-      pontos_esperados: Number(sumMedia(recommended).toFixed(2)),
-      valor_total: Number(sumPreco(recommended).toFixed(2)),
-    };
-    const { error } = await supabase
-      .from("escalacoes_usuario")
-      .upsert([myPayload, recPayload], { onConflict: "user_id,rodada,tipo" });
+    let error:Error|null=null;
+    if(myLineup.length!==12||recommended.length!==12){
+      error=new Error("Escalação incompleta: são necessários 11 atletas e um técnico.");
+    }else if(sumPreco(myLineup)>budget){
+      error=new Error("Seu time excedeu o patrimônio informado.");
+    }else{
+      try{
+        const result=await fetch("/api/lineups",{method:"POST",credentials:"same-origin",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({rodada,estrategia:strategy,
+            mine:{ids:myLineup.map(a=>a.id),score:sumMedia(myLineup),price:sumPreco(myLineup)},
+            recommended:{ids:recommended.map(a=>a.id),score:sumMedia(recommended),price:sumPreco(recommended)}})});
+        const data=await result.json();if(!result.ok)throw Error(data.error||"Erro ao salvar");
+      }catch(e){error=e instanceof Error?e:new Error("Falha de rede")}
+    }
     setSaving(false);
     if (error) {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
@@ -258,6 +229,23 @@ const TeamBuilder = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        <Card className="border-primary/50 p-4 mb-5 space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="font-bold text-lg">Patrimônio para montar o time</h2>
+              <p className="text-xs text-muted-foreground">2026 começa com C$ 100. Ajuste para o saldo real do seu time no Cartola.</p>
+            </div>
+            <label className="text-sm flex items-center gap-2">
+              C$ <input className="w-28 rounded bg-background border border-border px-3 py-2 text-foreground" type="number"
+                min="35" max="1000" step="0.5" value={budget}
+                onChange={(e)=>setBudget(Math.min(1000,Math.max(35,Number(e.target.value)||100)))}/>
+            </label>
+          </div>
+          {!marketOpen&&<p className="text-sm text-amber-500 font-semibold">Mercado fechado: sugestões simuladas para estudo da rodada. Não é possível confirmar no Cartola agora.</p>}
+          {optimizing&&<p className="text-sm text-primary flex gap-2 items-center"><Loader2 className="w-4 h-4 animate-spin"/> Calculando combinações sob orçamento e adversários...</p>}
+          {optimizerContext&&<p className="text-xs text-muted-foreground">{optimizerContext} · Capitão sugerido: {recommended.find(a=>a.id===captainId)?.apelido||"—"} (1,5×)</p>}
+          {optimizerError&&<p className="text-sm text-destructive">{optimizerError}</p>}
+        </Card>
         {/* Strategy Selector */}
         <div className="grid md:grid-cols-3 gap-4 mb-6">
           {(Object.keys(STRATEGIES) as Strategy[]).map((key) => {
@@ -364,12 +352,12 @@ const TeamBuilder = () => {
             <div
               className={cn(
                 "text-2xl font-black",
-                BUDGET - myPrice >= 0 ? "text-foreground" : "text-destructive"
+                budget - myPrice >= 0 ? "text-foreground" : "text-destructive"
               )}
             >
-              C$ {(BUDGET - myPrice).toFixed(2)}
+              C$ {(budget - myPrice).toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground uppercase">Saldo (Cap. {BUDGET})</p>
+            <p className="text-xs text-muted-foreground uppercase">Saldo (Cap. {budget})</p>
           </Card>
         </div>
 
