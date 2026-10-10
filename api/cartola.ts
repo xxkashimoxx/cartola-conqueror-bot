@@ -25,6 +25,8 @@ async function cartola(path: string) {
   return response.json();
 }
 async function authorizeAdmin(req: any) {
+  const secret = process.env.CRON_SECRET;
+  if (secret && String(req.headers.authorization || "") === "Bearer " + secret) return true;
   if (!JWKS_URL) throw new Error("NEON_AUTH_JWKS_URL não configurada");
   const match = /^Bearer (.+)$/i.exec(String(req.headers.authorization || ""));
   if (!match) return false;
@@ -137,13 +139,14 @@ async function syncMain(body: any) {
   const explicit = Array.isArray(body?.rodadas) ? body.rodadas.filter((x:any)=>Number.isInteger(x)&&x>=1&&x<mercado.rodada_atual) : [];
   const pending = explicit.length ? explicit : Array.from({length:Math.max(0,mercado.rodada_atual-1)},(_v,i)=>i+1)
     .filter(r=>force||!completed.has(r)||r===mercado.rodada_atual-1);
-  const rounds = pending.slice(0,8);
+  // Atualizar rodadas recentes antes do histórico antigo (reta final de 2026).
+  const rounds = pending.slice().sort((a,b)=>b-a).slice(0,8);
   let pointsSaved=0,roundsSaved=0;
   for(const round of rounds) {
     try {
       const resp:any=await cartola("atletas/pontuados/"+round);
-      const pointRows=Object.values(resp.atletas||{}).map((a:any)=>({
-        atleta_id:Number(a.atleta_id),rodada:round,pontos:Number(a.pontuacao)||0,
+      const pointRows=Object.entries(resp.atletas||{}).map(([id,a]:[string,any])=>({
+        atleta_id:Number(id),rodada:round,pontos:Number(a.pontuacao)||0,
         preco:a.preco_num==null?null:Number(a.preco_num),
       })).filter((a:any)=>Number.isSafeInteger(a.atleta_id));
       for(let i=0;i<pointRows.length;i+=300) {
@@ -181,15 +184,17 @@ async function syncMain(body: any) {
   }
   return {success:true,rodada:mercado.rodada_atual,clubes:clubs.length,atletas:athletes.length,
     pontuacoes:pointsSaved,rodadasAtualizadas:roundsSaved,partidas:matchesSaved,
-    rodadasPendentes:Math.max(0,pending.length-rounds.length),message:"Sincronização parcial/concluída; consulte rodadasPendentes"};
+    rodadasPendentes:Math.max(0,pending.length-rounds.length),temporada:mercado.temporada,
+    stats:{athletes:athletes.length,clubs:clubs.length,rounds:roundsSaved,matches:matchesSaved},
+    message:"Sincronização parcial/concluída; consulte rodadasPendentes"};
 }
 async function syncPartial() {
   const mercado:any=await cartola("mercado/status");
   const response:any=await cartola("atletas/pontuados");
   const sql=db();
   const round=mercado.rodada_atual;
-  const rows=Object.values(response.atletas||{}).map((a:any)=>({
-    atleta_id:Number(a.atleta_id),rodada:round,pontos:Number(a.pontuacao)||0,
+  const rows=Object.entries(response.atletas||{}).map(([id,a]:[string,any])=>({
+    atleta_id:Number(id),rodada:round,pontos:Number(a.pontuacao)||0,
     scout:a.scout||{},jogou:a.entrou_em_campo===true||a.entrou_em_campo===1,
   })).filter((x:any)=>Number.isSafeInteger(x.atleta_id));
   for(let i=0;i<rows.length;i+=300) {
@@ -208,6 +213,10 @@ export default async function handler(req:any,res:any) {
   const name=String(req.query?.name||"");
   if(req.method!=="GET"&&req.method!=="POST") return json(res,405,{error:"Método inválido"});
   try {
+    if(name==="status-temporada") {
+      const m=await cartola("mercado/status");
+      return json(res,200,{success:true,temporada:m.temporada,rodada:m.rodada_atual,rodadaFinal:m.rodada_final || 38,mercado:m.status_mercado,bolaRolando:!!m.bola_rolando,fechamento:m.fechamento,fonte:"Cartola FC - Globo",consultadoEm:new Date().toISOString()});
+    }
     if(name==="get-top-players") return json(res,200,await topPlayers(
       integer(req.body?.limit ?? req.query?.limit,20,300),
       req.body?.posicao?integer(req.body.posicao,0,6):undefined));
