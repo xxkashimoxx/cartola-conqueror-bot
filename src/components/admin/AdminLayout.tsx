@@ -28,7 +28,6 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
   const navItems = [
     { icon: BarChart3, label: "Analytics", path: "/admin" },
-    { icon: Users, label: "Usuários", path: "/admin/users" },
     { icon: RefreshCw, label: "Sincronização", path: "/admin/sync" },
     { icon: Settings, label: "Configurações", path: "/admin/settings" },
   ];
@@ -43,7 +42,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
             <h1 className="text-xl font-bold text-neon-cyan">Admin Panel</h1>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {user?.email}
+            Acesso exclusivo do proprietário
           </p>
         </div>
 
