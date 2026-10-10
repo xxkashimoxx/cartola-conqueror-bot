@@ -17,7 +17,6 @@ import Simulador from "./pages/Simulador";
 import MercadoInteligente from "./pages/MercadoInteligente";
 import Oportunidades from "./pages/Oportunidades";
 import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSync from "./pages/admin/AdminSync";
 import AdminSettings from "./pages/admin/AdminSettings";
 import NotFound from "./pages/NotFound";
@@ -53,14 +52,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/admin/users"
-              element={
-                <ProtectedRoute requireAdmin>
-                  <AdminUsers />
-                </ProtectedRoute>
-              }
-            />
+            <Route path="/admin/users" element={<Navigate to="/admin" replace />} />
             <Route
               path="/admin/sync"
               element={
