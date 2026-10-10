@@ -24,8 +24,8 @@ async function partidas(round:number) {
   return sql.query("select p.*,jsonb_build_object('id',c.id,'nome',c.nome,'abreviacao',c.abreviacao,'escudo_url',c.escudo_url) time_casa,jsonb_build_object('id',v.id,'nome',v.nome,'abreviacao',v.abreviacao,'escudo_url',v.escudo_url) time_fora from public.partidas p left join public.clubes c on c.id=p.time_casa_id left join public.clubes v on v.id=p.time_fora_id where p.rodada=$1 order by p.data_partida asc nulls last", [round]);
 }
 function formatPartida(p:any) {
-  return {...p,clean_sheet_casa:num(p.clean_sheet_casa),clean_sheet_fora:num(p.clean_sheet_fora),
-    xg_casa:num(p.xg_casa),xg_fora:num(p.xg_fora)};
+  return {...p,clean_sheet_casa:p.clean_sheet_casa==null?null:num(p.clean_sheet_casa),clean_sheet_fora:p.clean_sheet_fora==null?null:num(p.clean_sheet_fora),
+    xg_casa:p.xg_casa==null?null:num(p.xg_casa),xg_fora:p.xg_fora==null?null:num(p.xg_fora)};
 }
 async function confrontos(body:any){
   const rodada=await rodadaAtual();
