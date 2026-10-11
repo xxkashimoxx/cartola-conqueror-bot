@@ -26,7 +26,7 @@ export default async function handler(req:any,res:any){
     periodo:p.periodo_tr||null,
     fonte:p.transmissao?.url||null,
   })).sort((a:any,b:any)=>new Date(a.partidaEm).valueOf()-new Date(b.partidaEm).valueOf());
-  res.setHeader("Cache-Control","public,s-maxage=30,stale-while-revalidate=60");
+  res.setHeader("Cache-Control","private,no-store");
   return res.status(200).json({success:true,temporada:s.temporada||2026,rodada:round,rodadaFinal:s.rodada_final||38,
     retaFinal:round>=27,rodadasRestantes:Math.max(0,(s.rodada_final||38)-round+1),
     bolaRolando:!!s.bola_rolando,mercadoAberto:s.status_mercado===1,
