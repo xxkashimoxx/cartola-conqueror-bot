@@ -140,6 +140,7 @@ const TeamBuilder = () => {
           const map=new Map(atletas.map(a=>[a.id,a]));
           const stored=mine.atleta_ids.map((id:number)=>map.get(id)).filter(Boolean) as Atleta[];
           setSavedTeam({ids:mine.atleta_ids,captainId:mine.captain_id??null,updatedAt:mine.updated_at});
+          setBudget(previous=>Math.max(previous,Math.ceil((Number(mine.valor_total)||0)*2)/2));
           if(stored.length===12)setMyLineup(stored);
           setCaptainId(mine.captain_id??null);
           setActualScore(mine.score||null);
@@ -166,6 +167,7 @@ const TeamBuilder = () => {
   // Recalculate the hypothetical score for the exact current draft, including captain.
   useEffect(()=>{
     if(!rodada||myLineup.length!==12||!savedLoaded)return;
+    setActualScore(null);
     let active=true;
     const controller=new AbortController();
     const refresh=async()=>{
@@ -308,6 +310,7 @@ const TeamBuilder = () => {
               <div>
                 <p className="text-sm font-bold text-neon-green">Meu Time salvo · rodada {rodada}</p>
                 <p className="text-xs text-muted-foreground">Este time está armazenado no Neon, inclusive durante mercado fechado.</p>
+                {savedTeam.captainId===null&&<p className="text-xs text-amber-500 mt-1">Escolha um capitão e clique em Salvar para registrar o bônus oficial de 50%.</p>}
               </div>
               <Badge variant="outline" className={isSavedCurrent?"border-neon-green text-neon-green":"border-amber-500 text-amber-500"}>
                 {isSavedCurrent?"Salvo e fixo":"Rascunho alterado · clique em Salvar"}
