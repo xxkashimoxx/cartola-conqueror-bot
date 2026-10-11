@@ -21,10 +21,10 @@ async function official(path:string) {
  return r.json();
 }
 export async function scoringContext(rodada:number):Promise<ScoreContext>{
- let actualRound:number|null=null,bolaRolando=false;
+ let actualRound:number|null=null,bolaRolando=false,marketOpen=false;
  try{
   const status:any=await official("mercado/status");
-  actualRound=Number(status.rodada_atual)||null;bolaRolando=!!status.bola_rolando;
+  actualRound=Number(status.rodada_atual)||null;bolaRolando=!!status.bola_rolando;marketOpen=status.status_mercado===1;
  }catch{
   const rows=await db.query("select rodada_atual from public.mercado_status order by created_at desc,id desc limit 1",[]);
   actualRound=rows.length?Number(rows[0].rodada_atual):null;
@@ -32,6 +32,7 @@ export async function scoringContext(rodada:number):Promise<ScoreContext>{
  const now=new Date().toISOString();
  if(actualRound!==null&&rodada>actualRound)return {rodada,currentRound:actualRound,source:"oficial",status:"ainda_nao_iniciada",updatedAt:now,points:new Map()};
  if(rodada===actualRound){
+  if(marketOpen&&!bolaRolando)return {rodada,currentRound:actualRound,source:"Cartola FC — mercado aberto",status:"aguardando_rodada",updatedAt:now,points:new Map()};
   try{
    const live=await official("atletas/pontuados");
    const points=parsePoints(live);
