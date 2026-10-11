@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Zap, Trophy, Shield, Flame, Scale, Loader2, Save, GitCompare, ArrowRightLeft, Lock, Crown, TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowLeft, Trophy, Shield, Flame, Scale, Loader2, Save, GitCompare, ArrowRightLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -71,8 +71,9 @@ const TeamBuilder = () => {
   const [optimizerError,setOptimizerError]=useState<string|null>(null);
   const [captainId,setCaptainId]=useState<number|null>(null);
   const [suggestedCaptainId,setSuggestedCaptainId]=useState<number|null>(null);
-  const [savedTeam,setSavedTeam]=useState<{ids:number[];captainId:number|null;updatedAt:string}|null>(null);
+  const [savedTeam,setSavedTeam]=useState<{ids:number[];captainId:number|null;updatedAt:string;strategy:Strategy}|null>(null);
   const [savedLoaded,setSavedLoaded]=useState(false);
+  const [pendingModeDraft,setPendingModeDraft]=useState(false);
   const [actualScore,setActualScore]=useState<any>(null);
   const [actualLoading,setActualLoading]=useState(false);
   const [marketOpen,setMarketOpen]=useState(false);
@@ -109,6 +110,11 @@ const TeamBuilder = () => {
         if(!alive)return;
         const projected=data.players as Atleta[];
         setRecommended(projected);
+        if(pendingModeDraft){
+          setMyLineup(projected);
+          setCaptainId(data.captainId||null);
+          setPendingModeDraft(false);
+        }
         if(Array.isArray(data.projections)){
           const projectedMap=new Map<number,any>(data.projections.map((p:any)=>[Number(p.id),p]));
           setAtletas(previous=>previous.map(a=>({...a,...(projectedMap.get(a.id)||{})})));
@@ -118,6 +124,7 @@ const TeamBuilder = () => {
         setOptimizerContext(data.cardsReviewed+" atletas analisados · "+data.teamsUsed+" clubes · formação "+data.formation);
       }catch(error){
         if(!alive||controller.signal.aborted)return;
+        setPendingModeDraft(false);
         setOptimizerError(error instanceof Error?error.message:"Erro ao otimizar");
       }finally{if(alive)setOptimizing(false);}
     })();
@@ -137,9 +144,13 @@ const TeamBuilder = () => {
         const mine=(payload.rows||[]).find((r:any)=>r.tipo==="minha");
         if(!active)return;
         if(mine?.atleta_ids?.length===12){
+          const storedStrategy: Strategy = ["balanceada","ofensiva","defensiva"].includes(mine.estrategia)
+            ? mine.estrategia as Strategy
+            : "balanceada";
+          setStrategy(storedStrategy);
           const map=new Map(atletas.map(a=>[a.id,a]));
           const stored=mine.atleta_ids.map((id:number)=>map.get(id)).filter(Boolean) as Atleta[];
-          setSavedTeam({ids:mine.atleta_ids,captainId:mine.captain_id??null,updatedAt:mine.updated_at});
+          setSavedTeam({ids:mine.atleta_ids,captainId:mine.captain_id??null,updatedAt:mine.updated_at,strategy:storedStrategy});
           setBudget(previous=>Math.max(previous,Math.ceil((Number(mine.valor_total)||0)*2)/2));
           if(stored.length===12)setMyLineup(stored);
           setCaptainId(mine.captain_id??null);
@@ -158,11 +169,11 @@ const TeamBuilder = () => {
   },[user?.id,rodada,atletas.length]);
 
   useEffect(()=>{
-    if(savedLoaded&&!savedTeam&&recommended.length&&myLineup.length===0){
+    if(savedLoaded&&!savedTeam&&!pendingModeDraft&&recommended.length&&myLineup.length===0){
       setMyLineup(recommended);
       setCaptainId(suggestedCaptainId);
     }
-  },[savedLoaded,savedTeam,recommended,myLineup.length,suggestedCaptainId]);
+  },[savedLoaded,savedTeam,recommended,myLineup.length,suggestedCaptainId,pendingModeDraft]);
 
   // Recalculate the hypothetical score for the exact current draft, including captain.
   useEffect(()=>{
@@ -189,7 +200,14 @@ const TeamBuilder = () => {
   },[rodada,savedLoaded,captainId,myLineup.map(a=>a.id).join(",")]);
 
   const isSavedCurrent=!!savedTeam&&myLineup.length===12&&
-    myLineup.every((a,i)=>a.id===savedTeam.ids[i])&&captainId===savedTeam.captainId;
+    myLineup.every((a,i)=>a.id===savedTeam.ids[i])&&captainId===savedTeam.captainId&&strategy===savedTeam.strategy;
+  const handleStrategyChange=(nextStrategy:Strategy)=>{
+    if(nextStrategy===strategy||loading||!savedLoaded)return;
+    setPendingModeDraft(true);
+    setMyLineup([]);
+    setCaptainId(null);
+    setStrategy(nextStrategy);
+  };
   const handleSwap = (newAtleta: Atleta) => {
     if (!swapping) return;
     setMyLineup((cur) => cur.map((a) => (a.id === swapping.id ? newAtleta : a)));
@@ -197,9 +215,11 @@ const TeamBuilder = () => {
   };
 
   const handleReset = () => {
+    if(recommended.length!==12)return;
+    setPendingModeDraft(false);
     setMyLineup(recommended);
     setCaptainId(suggestedCaptainId);
-    toast({ title: "Sugestão aplicada ao rascunho", description: "Seu time salvo não será modificado até clicar em Salvar." });
+    toast({ title: "Sugestão aplicada ao rascunho", description: "Clique em Salvar para fixar este time na rodada." });
   };
 
   const handleSave = async () => {
@@ -226,7 +246,7 @@ const TeamBuilder = () => {
             mine:{ids:myLineup.map(a=>a.id),captainId,score:projectedWithCaptain(myLineup,captainId),price:sumPreco(myLineup)},
             recommended:{ids:recommended.map(a=>a.id),captainId:suggestedCaptainId,score:projectedWithCaptain(recommended,suggestedCaptainId),price:sumPreco(recommended)}})});
         const data=await result.json();if(!result.ok)throw Error(data.error||"Erro ao salvar");
-        setSavedTeam({ids:myLineup.map(a=>a.id),captainId,updatedAt:new Date().toISOString()});
+        setSavedTeam({ids:myLineup.map(a=>a.id),captainId,updatedAt:new Date().toISOString(),strategy});
         if(data.score)setActualScore(data.score);
       }catch(e){error=e instanceof Error?e:new Error("Falha de rede")}
     }
@@ -238,15 +258,9 @@ const TeamBuilder = () => {
     }
   };
 
-  // Comparação
-  const myTotal = projectedWithCaptain(myLineup,captainId);
-  const recTotal = projectedWithCaptain(recommended,suggestedCaptainId);
-  const diff = myTotal - recTotal;
-  const myPrice = sumPreco(myLineup);
-  const recIds = new Set(recommended.map((a) => a.id));
-  const myIds = new Set(myLineup.map((a) => a.id));
-  const commonCount = [...myIds].filter((id) => recIds.has(id)).length;
-  const changedCount = myLineup.length - commonCount;
+  const myTotal=projectedWithCaptain(myLineup,captainId);
+  const myPrice=sumPreco(myLineup);
+  const recIds=new Set(recommended.map(a=>a.id));
 
   // Para o swap dialog: alternativas na mesma posição
   const swapOptions = useMemo(() => {
@@ -275,10 +289,10 @@ const TeamBuilder = () => {
             <Button onClick={() => navigate("/historico")} variant="outline" className="border-border">
               <GitCompare className="mr-2 h-4 w-4" /> Histórico
             </Button>
-            <Button onClick={handleReset} variant="outline" className="border-border">
-              <ArrowRightLeft className="mr-2 h-4 w-4" /> Resetar
+            <Button onClick={handleReset} variant="outline" disabled={optimizing||pendingModeDraft||recommended.length!==12} className="border-border">
+              <ArrowRightLeft className="mr-2 h-4 w-4" /> Voltar à sugestão
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/80 font-bold shadow-neon">
+            <Button onClick={handleSave} disabled={saving||loading||pendingModeDraft||optimizing||myLineup.length!==12} className="bg-primary hover:bg-primary/80 font-bold shadow-neon">
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Salvar
             </Button>
@@ -349,6 +363,10 @@ const TeamBuilder = () => {
             </div>
           )}
         </Card>
+        <div className="mb-3">
+          <h2 className="text-lg font-black uppercase tracking-wide">Modo da escalação</h2>
+          <p className="text-sm text-muted-foreground">Escolher outro modo monta uma nova sugestão. Seu time salvo só muda quando você clicar em Salvar.</p>
+        </div>
         {/* Strategy Selector */}
         <div className="grid md:grid-cols-3 gap-4 mb-6">
           {(Object.keys(STRATEGIES) as Strategy[]).map((key) => {
@@ -358,12 +376,15 @@ const TeamBuilder = () => {
             return (
               <button
                 key={key}
-                onClick={() => setStrategy(key)}
+                onClick={() => handleStrategyChange(key)}
+                aria-pressed={active}
+                disabled={loading || !savedLoaded || !rodada || saving}
                 className={cn(
-                  "text-left rounded-lg border-2 p-5 transition-all",
-                  active ? "border-primary bg-card shadow-neon" : "border-border bg-card/50 hover:border-primary/50"
+                  "relative text-left rounded-lg border-2 p-5 transition-all disabled:opacity-60",
+                  active ? "border-primary bg-primary/10 shadow-neon" : "border-border bg-card/50 hover:border-primary/50"
                 )}
               >
+                {active && <Badge className="absolute right-3 top-3 bg-primary text-primary-foreground">Selecionado</Badge>}
                 <Icon className={cn("h-8 w-8 mb-3", s.color)} />
                 <div className="text-lg font-black uppercase tracking-wide">{s.label}</div>
                 <p className="text-sm text-muted-foreground mt-1">{s.desc}</p>
@@ -372,84 +393,20 @@ const TeamBuilder = () => {
           })}
         </div>
 
-        {/* Comparação */}
-        <Card className="bg-card border-2 border-primary/40 shadow-neon p-5 mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <GitCompare className="h-5 w-5 text-neon-cyan" />
-            <h2 className="font-black uppercase tracking-wider text-neon-cyan">
-              Minha Escalação vs Recomendada
-            </h2>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-secondary/40 border border-border rounded p-3 text-center">
-              <p className="text-xs text-muted-foreground uppercase">Minha (proj.)</p>
-              <p className="text-2xl font-black text-foreground">{myTotal.toFixed(1)}</p>
-            </div>
-            <div className="bg-secondary/40 border border-border rounded p-3 text-center">
-              <p className="text-xs text-muted-foreground uppercase">Recomendada</p>
-              <p className="text-2xl font-black text-neon-green">{recTotal.toFixed(1)}</p>
-            </div>
-            <div
-              className={cn(
-                "border-2 rounded p-3 text-center",
-                diff >= 0 ? "border-neon-green/50 bg-neon-green/5" : "border-destructive/50 bg-destructive/5"
-              )}
-            >
-              <p className="text-xs text-muted-foreground uppercase flex items-center justify-center gap-1">
-                Diferença {diff >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              </p>
-              <p className={cn("text-2xl font-black", diff >= 0 ? "text-neon-green" : "text-destructive")}>
-                {diff >= 0 ? "+" : ""}{diff.toFixed(1)}
-              </p>
-            </div>
-            <div className="bg-secondary/40 border border-border rounded p-3 text-center">
-              <p className="text-xs text-muted-foreground uppercase">Trocas</p>
-              <p className="text-2xl font-black text-foreground">
-                {changedCount}<span className="text-sm text-muted-foreground">/{myLineup.length}</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Detalhamento jogador a jogador */}
-          {changedCount > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <p className="text-xs font-black uppercase tracking-wider text-neon-cyan mb-2 flex items-center gap-1">
-                <Crown className="h-3 w-3" /> Diferenças jogador a jogador
-              </p>
-              <div className="space-y-1">
-                {myLineup.map((mine, idx) => {
-                  const rec = recommended[idx];
-                  if (!rec || mine.id === rec.id) return null;
-                  const delta = Number(mine.media ?? 0) - Number(rec.media ?? 0);
-                  return (
-                    <div key={mine.id} className="flex items-center justify-between text-xs bg-secondary/30 border border-border rounded p-2">
-                      <span className="text-muted-foreground">
-                        <span className="text-destructive line-through">{rec.apelido}</span>
-                        {" → "}
-                        <span className="text-foreground font-bold">{mine.apelido}</span>
-                        <span className="text-muted-foreground"> ({POS_LABEL[mine.posicao_id ?? 0]})</span>
-                      </span>
-                      <span className={cn("font-black", delta >= 0 ? "text-neon-green" : "text-destructive")}>
-                        {delta >= 0 ? "+" : ""}{delta.toFixed(2)}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </Card>
-
+        <div className="mb-3">
+          <h2 className="text-lg font-black uppercase tracking-wide">Seu time para a rodada</h2>
+          <p className="text-sm text-muted-foreground">Uma escalação editável. Clique em um atleta para trocar por outro da mesma posição.</p>
+        </div>
         {/* Stats */}
         <div className="grid md:grid-cols-3 gap-4 mb-6">
           <Card className="bg-card border-border p-5 text-center">
             <Trophy className="h-7 w-7 text-neon-green mx-auto mb-1" />
             <div className="text-2xl font-black text-neon-green">{myTotal.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground uppercase">Média Projetada</p>
+            <p className="text-xs text-muted-foreground uppercase">Pontos projetados</p>
           </Card>
           <Card className="bg-card border-border p-5 text-center">
             <div className="text-2xl font-black text-foreground">C$ {myPrice.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground uppercase">Valor da Minha</p>
+            <p className="text-xs text-muted-foreground uppercase">Valor do time</p>
           </Card>
           <Card className="bg-card border-border p-5 text-center">
             <div
@@ -465,13 +422,14 @@ const TeamBuilder = () => {
         </div>
 
         {/* Minha Escalação editável */}
-        {loading ? (
-          <div className="flex justify-center py-20">
+        {loading || !savedLoaded || pendingModeDraft ? (
+          <div className="flex items-center justify-center gap-3 py-20 text-muted-foreground">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span>{pendingModeDraft ? `Montando a sugestão ${STRATEGIES[strategy].label}...` : "Carregando seu time..."}</span>
           </div>
         ) : myLineup.length === 0 ? (
           <Card className="p-8 text-center bg-card border-border">
-            <p className="text-muted-foreground">Sem dados. Sincronize o mercado no painel admin.</p>
+            <p className="text-muted-foreground">Não foi possível montar uma escalação. Confira o aviso acima e ajuste o orçamento.</p>
           </Card>
         ) : (
           <>
