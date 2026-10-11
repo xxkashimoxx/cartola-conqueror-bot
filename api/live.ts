@@ -14,7 +14,7 @@ export default async function handler(req:any,res:any){
       atleta_id:Number(id),pontos:Number(p.pontuacao)||0,scout:p.scout||{},
       jogou:p.entrou_em_campo===true,atualizado_em:new Date().toISOString()
     })).filter(p=>Number.isSafeInteger(p.atleta_id));
-    res.setHeader("Cache-Control","public, s-maxage=20, stale-while-revalidate=30");
+    res.setHeader("Cache-Control","private, no-store");
     return res.status(200).json({success:true,temporada:mercado.temporada,rodada:mercado.rodada_atual,
       bolaRolando:!!mercado.bola_rolando,status_mercado:mercado.status_mercado,
       atualizado_em:new Date().toISOString(),scores});
