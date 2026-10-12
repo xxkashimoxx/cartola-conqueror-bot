@@ -24,17 +24,21 @@ interface EscalacaoRow {
   tipo: "minha" | "recomendada";
   estrategia: string | null;
   atleta_ids: number[];
+  reservas_ids?: number[];
   pontos_esperados: number | null;
   valor_total: number | null;
   updated_at: string;
   captain_id: number | null;
-  score?: {total:number|null;status:string;source:string;coverage:number;captainBonus:number|null;players:{id:number;points:number}[]};
+  score?: {total:number|null;status:string;source:string;coverage:number;captainBonus:number|null;
+    players:{id:number;points:number}[];substitutions?:{outId:number;inId:number;captain:boolean}[]};
 }
 
 interface RodadaResumo {
   rodada: number;
   estrategia: string | null;
   minhaIds: number[];
+  reservasIds: number[];
+  substituicoes: {outId:number;inId:number;captain:boolean}[];
   recIds: number[];
   minhaEsperado: number;
   recEsperado: number;
@@ -72,7 +76,7 @@ const HistoricoEscalacoes = () => {
           for(const p of r.score?.players||[])points[p.id+"-"+r.rodada]=Number(p.points);
         }
         setPontosPorRodada(points);
-        const ids=[...new Set(list.flatMap(r=>r.atleta_ids||[]))];
+        const ids=[...new Set(list.flatMap(r=>[...(r.atleta_ids||[]),...(r.reservas_ids||[])]))];
         if(ids.length){
           const {data:players}=await supabase.from("atletas").select("id,apelido").in("id",ids.slice(0,250));
           if(active){
@@ -96,6 +100,8 @@ const HistoricoEscalacoes = () => {
         rodada: r.rodada,
         estrategia: r.estrategia,
         minhaIds: [],
+        reservasIds: [],
+        substituicoes: [],
         recIds: [],
         minhaEsperado: 0,
         recEsperado: 0,
@@ -109,6 +115,8 @@ const HistoricoEscalacoes = () => {
       };
       if (r.tipo === "minha") {
         existing.minhaIds = r.atleta_ids ?? [];
+        existing.reservasIds = r.reservas_ids ?? [];
+        existing.substituicoes = r.score?.substitutions ?? [];
         existing.minhaEsperado = Number(r.pontos_esperados ?? 0);
         existing.minhaReal = r.score?.total ?? null;
         existing.currentStatus = r.score?.status || null;
@@ -342,6 +350,17 @@ const HistoricoEscalacoes = () => {
 
                       {r.source && <p className="text-xs text-muted-foreground mt-2">Fonte: {r.source} · Rodada {r.rodada}</p>}
                       {r.captainMissing && <p className="text-xs text-amber-500 mt-1">Capitão não registrado nesta escalação antiga: o total mostrado não contém o bônus de 50%. Selecione o capitão em Meu Time e salve.</p>}
+                      {r.reservasIds.length>0&&<div className="pt-3 mt-3 border-t border-border">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-neon-cyan mb-2">Banco de reservas ({r.reservasIds.length}/5)</p>
+                        <div className="flex flex-wrap gap-1">
+                          {r.reservasIds.map(id=><Badge key={id} variant="outline" className="text-[10px]">
+                            {atletasMap[id]??`#${id}`}{r.substituicoes.some(s=>s.inId===id)?" · entrou":""}
+                          </Badge>)}
+                        </div>
+                        {r.substituicoes.map(s=><p key={s.outId} className="text-xs text-neon-green mt-2">
+                          {atletasMap[s.outId]??`#${s.outId}`} → {atletasMap[s.inId]??`#${s.inId}`}{s.captain?" · capitão":""}
+                        </p>)}
+                      </div>}
                       {/* Detalhamento de trocas */}
                       {r.trocas > 0 && (
                         <div className="pt-3 border-t border-border">

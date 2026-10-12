@@ -114,9 +114,16 @@ function optimize(candidates:Candidate[],budget:number){
  const best=valid[0];
  const captain=[...best.lineup].filter(c=>c.posicao_id!==6)
   .sort((a,b)=>(b.predictedScore-(b.volatility*.24))-(a.predictedScore-a.volatility*.24))[0];
+  const starterIds=new Set(best.lineup.map(a=>a.id));
+  const reserves=[1,2,3,4,5].map(position=>{
+   const cheapest=Math.min(...best.lineup.filter(a=>a.posicao_id===position).map(a=>a.preco));
+   return candidates.filter(a=>a.posicao_id===position&&!starterIds.has(a.id)&&a.status_id===7&&
+     Math.round(a.preco*100)<=Math.round(cheapest*100))
+     .sort((a,b)=>b.objective-a.objective)[0]||null;
+  });
  return {players:best.lineup,capital:round(best.total),remaining:round(budget-best.total),
   projectedPoints:round(best.lineup.reduce((s,c)=>s+c.predictedScore,0)+Math.max(0,captain?.predictedScore||0)*.5),
-  objective:round(best.objective),captainId:captain?.id,formation:"4-3-3",cardsReviewed:candidates.length,teamsUsed:Object.keys(best.teams).length};
+   objective:round(best.objective),captainId:captain?.id,reserves,formation:"4-3-3",cardsReviewed:candidates.length,teamsUsed:Object.keys(best.teams).length};
 }
 export default async function handler(req:any,res:any){
  if(!ownerOnly(req,res))return;

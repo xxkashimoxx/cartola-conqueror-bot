@@ -130,15 +130,16 @@ async function syncMain(body: any) {
       const resp:any=await cartola("atletas/pontuados/"+round);
       const pointRows=Object.entries(resp.atletas||{}).map(([id,a]:[string,any])=>({
         atleta_id:Number(id),rodada:round,pontos:Number(a.pontuacao)||0,
-        preco:a.preco_num==null?null:Number(a.preco_num),
+         preco:a.preco_num==null?null:Number(a.preco_num),
+         jogou:a.entrou_em_campo==null?null:a.entrou_em_campo===true||a.entrou_em_campo===1,
       })).filter((a:any)=>Number.isSafeInteger(a.atleta_id));
       for(let i=0;i<pointRows.length;i+=300) {
         await sql.query(`
-          insert into public.atleta_pontuacoes(atleta_id,rodada,pontos,preco)
-          select r.atleta_id,r.rodada,r.pontos,r.preco
-          from jsonb_to_recordset($1::jsonb) as r(atleta_id int,rodada int,pontos numeric,preco numeric)
+           insert into public.atleta_pontuacoes(atleta_id,rodada,pontos,preco,jogou)
+           select r.atleta_id,r.rodada,r.pontos,r.preco,r.jogou
+           from jsonb_to_recordset($1::jsonb) as r(atleta_id int,rodada int,pontos numeric,preco numeric,jogou boolean)
           where exists(select 1 from public.atletas a where a.id=r.atleta_id)
-          on conflict(atleta_id,rodada) do update set pontos=excluded.pontos,preco=excluded.preco
+           on conflict(atleta_id,rodada) do update set pontos=excluded.pontos,preco=excluded.preco,jogou=excluded.jogou
         `,[JSON.stringify(pointRows.slice(i,i+300))]);
       }
       if(pointRows.length) {pointsSaved+=pointRows.length;roundsSaved++;}
@@ -187,7 +188,7 @@ async function syncPartial() {
   const round=mercado.rodada_atual;
   const rows=Object.entries(response.atletas||{}).map(([id,a]:[string,any])=>({
     atleta_id:Number(id),rodada:round,pontos:Number(a.pontuacao)||0,
-    scout:a.scout||{},jogou:a.entrou_em_campo===true||a.entrou_em_campo===1,
+     scout:a.scout||{},jogou:a.entrou_em_campo==null?null:a.entrou_em_campo===true||a.entrou_em_campo===1,
   })).filter((x:any)=>Number.isSafeInteger(x.atleta_id));
   for(let i=0;i<rows.length;i+=300) {
     await sql.query(`
