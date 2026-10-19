@@ -10,8 +10,8 @@ import { useAuth } from "@/hooks/useAuth";
 
 import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { FORMATION, optimizeLineup, projections, type HistoryPoint, type Matchup, type Strategy } from "@/lib/lineupOptimizer";
 
-type Strategy = "balanceada" | "ofensiva" | "defensiva";
 
 interface Atleta {
   id: number;
@@ -30,8 +30,7 @@ interface Clube {
 }
 
 const POS_LABEL: Record<number, string> = { 1: "GOL", 2: "LAT", 3: "ZAG", 4: "MEI", 5: "ATA", 6: "TEC" };
-const FORMATION: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 3, 6: 1 };
-const BUDGET = 140;
+const DEFAULT_BUDGET = 100;
 
 const STRATEGIES: Record<Strategy, { label: string; desc: string; icon: typeof Shield; color: string }> = {
   balanceada: { label: "Balanceada", desc: "Equilíbrio entre risco e segurança", icon: Scale, color: "text-neon-cyan" },
@@ -39,65 +38,6 @@ const STRATEGIES: Record<Strategy, { label: string; desc: string; icon: typeof S
   defensiva: { label: "Defensiva", desc: "Pontuação segura e consistente", icon: Shield, color: "text-neon-green" },
 };
 
-function scoreAtleta(a: Atleta, strategy: Strategy): number {
-  const media = Number(a.media ?? 0);
-  const preco = Number(a.preco ?? 0);
-  const jogos = Number(a.jogos ?? 0);
-  const pos = a.posicao_id ?? 0;
-  if (strategy === "ofensiva") {
-    const boost = pos === 5 ? 1.35 : pos === 4 ? 1.15 : 1;
-    return (media * boost) + (preco * 0.18);
-  }
-  if (strategy === "defensiva") {
-    const boost = pos === 1 ? 1.25 : pos === 3 ? 1.2 : pos === 2 ? 1.15 : 1;
-    return (media * boost) + Math.min(jogos, 15) * 0.18 - preco * 0.03;
-  }
-  return media + Math.min(jogos, 15) * 0.08;
-}
-
-function buildLineup(atletas: Atleta[], strategy: Strategy): Atleta[] {
-  const provaveis = atletas.filter(
-    (a) => (a.jogos ?? 0) >= 2 && (a.status_id === 7 || a.status_id === null || a.status_id === 0)
-  );
-  const byPos: Record<number, Atleta[]> = {};
-  for (const a of provaveis) {
-    const p = a.posicao_id ?? 0;
-    if (!FORMATION[p]) continue;
-    (byPos[p] ||= []).push(a);
-  }
-  for (const p in byPos) {
-    byPos[+p].sort((x, y) => scoreAtleta(y, strategy) - scoreAtleta(x, strategy));
-  }
-  const picked: Atleta[] = [];
-  for (const pos of Object.keys(FORMATION).map(Number)) {
-    const need = FORMATION[pos];
-    const pool = byPos[pos] || [];
-    picked.push(...pool.slice(0, need));
-  }
-  let total = picked.reduce((s, a) => s + Number(a.preco ?? 0), 0);
-  let guard = 0;
-  while (total > BUDGET && guard < 50) {
-    const sortedByCost = [...picked].sort((a, b) => Number(b.preco ?? 0) - Number(a.preco ?? 0));
-    let swapped = false;
-    for (const expensive of sortedByCost) {
-      const pos = expensive.posicao_id ?? 0;
-      const pool = byPos[pos] || [];
-      const idx = pool.findIndex((x) => x.id === expensive.id);
-      const next = pool.slice(idx + 1).find((cand) => !picked.some((p) => p.id === cand.id));
-      if (next && Number(next.preco ?? 0) < Number(expensive.preco ?? 0)) {
-        picked[picked.indexOf(expensive)] = next;
-        total = picked.reduce((s, a) => s + Number(a.preco ?? 0), 0);
-        swapped = true;
-        break;
-      }
-    }
-    if (!swapped) break;
-    guard++;
-  }
-  return picked;
-}
-
-const sumMedia = (l: Atleta[]) => l.reduce((s, a) => s + Number(a.media ?? 0), 0);
 const sumPreco = (l: Atleta[]) => l.reduce((s, a) => s + Number(a.preco ?? 0), 0);
 
 const TeamBuilder = () => {
@@ -113,11 +53,16 @@ const TeamBuilder = () => {
   const [myLineup, setMyLineup] = useState<Atleta[]>([]);
   const [swapping, setSwapping] = useState<Atleta | null>(null);
   const [saving, setSaving] = useState(false);
+  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [matches, setMatches] = useState<Matchup[]>([]);
+  const [analysisReady, setAnalysisReady] = useState(false);
+  const [budget, setBudget] = useState(() => Number(localStorage.getItem("cartola_budget")) || DEFAULT_BUDGET);
+  const [savedLineup, setSavedLineup] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const [{ data: ats }, { data: cls }, { data: mercado }] = await Promise.all([
+      const [{ data: ats, error: athletesError }, { data: cls }, { data: mercado }] = await Promise.all([
         supabase.from("atletas").select("id,apelido,posicao_id,clube_id,preco,media,jogos,status_id").limit(1000),
         supabase.from("clubes").select("id,abreviacao"),
         supabase.from("mercado_status").select("rodada_atual").order("created_at", { ascending: false }).limit(1).maybeSingle(),
@@ -127,18 +72,39 @@ const TeamBuilder = () => {
       (cls as Clube[] | null)?.forEach((c) => (map[c.id] = c));
       setClubes(map);
       setRodada(mercado?.rodada_atual ?? 0);
+      if (athletesError) toast({ title: "Erro ao buscar atletas", description: athletesError.message, variant: "destructive" });
       setLoading(false);
     })();
-  }, []);
+  }, [toast]);
 
-  const recommended = useMemo(() => buildLineup(atletas, strategy), [atletas, strategy]);
+  useEffect(() => {
+    if (!rodada) { setAnalysisReady(true); return; }
+    setAnalysisReady(false);
+    (async () => {
+      const [{ data: games, error: gamesError }, ...scores] = await Promise.all([
+        supabase.from("partidas").select("time_casa_id,time_fora_id,xg_casa,xg_fora").eq("rodada", rodada),
+        ...Array.from({ length: Math.min(5, rodada - 1) }, (_, i) =>
+          supabase.from("atleta_pontuacoes").select("atleta_id,rodada,pontos").eq("rodada", rodada - i - 1).limit(1000)),
+      ]);
+      setMatches((games ?? []) as Matchup[]);
+      setHistory(scores.flatMap((result) => (result.data ?? []) as HistoryPoint[]));
+      if (gamesError || scores.some((result) => result.error)) {
+        toast({ title: "Dados de análise incompletos", description: "Confira a sincronização antes de usar a recomendação.", variant: "destructive" });
+      }
+      setAnalysisReady(true);
+    })();
+  }, [rodada, toast]);
+
+  const values = useMemo(() => projections(atletas, history, matches, strategy), [atletas, history, matches, strategy]);
+  const projected = (lineup: Atleta[]) => lineup.reduce((sum, a) => sum + (values.get(a.id) ?? 0), 0);
+  const recommended = useMemo(() => optimizeLineup(atletas, values, budget), [atletas, values, budget]);
 
   // Sincroniza minha escalação quando muda recomendada (primeira vez ou reset)
   useEffect(() => {
-    if (recommended.length && myLineup.length === 0) {
+    if (analysisReady && recommended.length && myLineup.length === 0 && !savedLineup) {
       setMyLineup(recommended);
     }
-  }, [recommended]);
+  }, [recommended, analysisReady, myLineup.length, savedLineup]);
 
   // Carregar escalação salva do usuário, se existir
   useEffect(() => {
@@ -146,12 +112,14 @@ const TeamBuilder = () => {
     (async () => {
       const { data } = await supabase
         .from("escalacoes_usuario")
-        .select("atleta_ids")
+        .select("atleta_ids,estrategia")
         .eq("user_id", user.id)
         .eq("rodada", rodada)
         .eq("tipo", "minha")
         .maybeSingle();
       if (data?.atleta_ids?.length) {
+        setSavedLineup(true);
+        if (["balanceada", "ofensiva", "defensiva"].includes(data.estrategia ?? "")) setStrategy(data.estrategia as Strategy);
         const map = new Map(atletas.map((a) => [a.id, a]));
         const saved = (data.atleta_ids as number[]).map((id) => map.get(id)).filter(Boolean) as Atleta[];
         if (saved.length) setMyLineup(saved);
@@ -161,6 +129,10 @@ const TeamBuilder = () => {
 
   const handleSwap = (newAtleta: Atleta) => {
     if (!swapping) return;
+    if (sumPreco(myLineup) - Number(swapping.preco ?? 0) + Number(newAtleta.preco ?? 0) > budget + 0.001) {
+      toast({ title: "Orçamento excedido", description: "Ajuste o patrimônio ou escolha outro atleta.", variant: "destructive" });
+      return;
+    }
     setMyLineup((cur) => cur.map((a) => (a.id === swapping.id ? newAtleta : a)));
     setSwapping(null);
   };
@@ -179,6 +151,11 @@ const TeamBuilder = () => {
       toast({ title: "Sem rodada", description: "Sincronize o mercado primeiro.", variant: "destructive" });
       return;
     }
+    if (myLineup.length !== 12 || Object.entries(FORMATION).some(([pos, count]) => myLineup.filter((a) => a.posicao_id === Number(pos)).length !== count) ||
+      new Set(myLineup.map((a) => a.id)).size !== 12 || sumPreco(myLineup) > budget + 0.001) {
+      toast({ title: "Escalação inválida", description: "Confira os 12 titulares, posições e patrimônio.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     const myPayload = {
       user_id: user.id,
@@ -186,7 +163,7 @@ const TeamBuilder = () => {
       tipo: "minha" as const,
       estrategia: strategy,
       atleta_ids: myLineup.map((a) => a.id),
-      pontos_esperados: Number(sumMedia(myLineup).toFixed(2)),
+      pontos_esperados: Number(projected(myLineup).toFixed(2)),
       valor_total: Number(sumPreco(myLineup).toFixed(2)),
     };
     const recPayload = {
@@ -195,7 +172,7 @@ const TeamBuilder = () => {
       tipo: "recomendada" as const,
       estrategia: strategy,
       atleta_ids: recommended.map((a) => a.id),
-      pontos_esperados: Number(sumMedia(recommended).toFixed(2)),
+      pontos_esperados: Number(projected(recommended).toFixed(2)),
       valor_total: Number(sumPreco(recommended).toFixed(2)),
     };
     const { error } = await supabase
@@ -205,13 +182,14 @@ const TeamBuilder = () => {
     if (error) {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
     } else {
+      setSavedLineup(true);
       toast({ title: "Escalação salva!", description: `Rodada ${rodada} guardada com sucesso.` });
     }
   };
 
   // Comparação
-  const myTotal = sumMedia(myLineup);
-  const recTotal = sumMedia(recommended);
+  const myTotal = projected(myLineup);
+  const recTotal = projected(recommended);
   const diff = myTotal - recTotal;
   const myPrice = sumPreco(myLineup);
   const recIds = new Set(recommended.map((a) => a.id));
@@ -224,10 +202,10 @@ const TeamBuilder = () => {
     if (!swapping) return [] as Atleta[];
     const pos = swapping.posicao_id;
     return atletas
-      .filter((a) => a.posicao_id === pos && a.id !== swapping.id && (a.jogos ?? 0) >= 1)
-      .sort((a, b) => Number(b.media ?? 0) - Number(a.media ?? 0))
+      .filter((a) => a.posicao_id === pos && a.id !== swapping.id && (a.jogos ?? 0) >= 1 && a.status_id === 7)
+      .sort((a, b) => (values.get(b.id) ?? 0) - (values.get(a.id) ?? 0))
       .slice(0, 30);
-  }, [swapping, atletas]);
+  }, [swapping, atletas, values]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -258,6 +236,18 @@ const TeamBuilder = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        <div className="mb-6 flex flex-wrap items-center gap-3 text-sm">
+          <label htmlFor="patrimonio" className="font-bold">Patrimônio disponível (C$)</label>
+          <input id="patrimonio" type="number" min="1" max="1000" step="0.01" value={budget}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              if (Number.isFinite(next) && next > 0 && next <= 1000) {
+                setBudget(next);
+                localStorage.setItem("cartola_budget", String(next));
+              }
+            }} className="w-28 rounded border border-border bg-card px-3 py-2" />
+          <span className="text-muted-foreground">Informe o patrimônio exibido no Cartola antes de salvar.</span>
+        </div>
         {/* Strategy Selector */}
         <div className="grid md:grid-cols-3 gap-4 mb-6">
           {(Object.keys(STRATEGIES) as Strategy[]).map((key) => {
@@ -329,7 +319,7 @@ const TeamBuilder = () => {
                 {myLineup.map((mine, idx) => {
                   const rec = recommended[idx];
                   if (!rec || mine.id === rec.id) return null;
-                  const delta = Number(mine.media ?? 0) - Number(rec.media ?? 0);
+                  const delta = (values.get(mine.id) ?? 0) - (values.get(rec.id) ?? 0);
                   return (
                     <div key={mine.id} className="flex items-center justify-between text-xs bg-secondary/30 border border-border rounded p-2">
                       <span className="text-muted-foreground">
@@ -354,7 +344,7 @@ const TeamBuilder = () => {
           <Card className="bg-card border-border p-5 text-center">
             <Trophy className="h-7 w-7 text-neon-green mx-auto mb-1" />
             <div className="text-2xl font-black text-neon-green">{myTotal.toFixed(1)}</div>
-            <p className="text-xs text-muted-foreground uppercase">Média Projetada</p>
+            <p className="text-xs text-muted-foreground uppercase">Projeção estimada</p>
           </Card>
           <Card className="bg-card border-border p-5 text-center">
             <div className="text-2xl font-black text-foreground">C$ {myPrice.toFixed(2)}</div>
@@ -364,12 +354,12 @@ const TeamBuilder = () => {
             <div
               className={cn(
                 "text-2xl font-black",
-                BUDGET - myPrice >= 0 ? "text-foreground" : "text-destructive"
+                budget - myPrice >= 0 ? "text-foreground" : "text-destructive"
               )}
             >
-              C$ {(BUDGET - myPrice).toFixed(2)}
+              C$ {(budget - myPrice).toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground uppercase">Saldo (Cap. {BUDGET})</p>
+            <p className="text-xs text-muted-foreground uppercase">Saldo (Cap. {budget})</p>
           </Card>
         </div>
 
@@ -424,9 +414,9 @@ const TeamBuilder = () => {
                         <div className="flex items-center gap-6">
                           <div className="text-center">
                             <div className="text-2xl font-black text-neon-green">
-                              {Number(a.media ?? 0).toFixed(1)}
+                              {(values.get(a.id) ?? 0).toFixed(1)}
                             </div>
-                            <p className="text-xs text-muted-foreground uppercase">Média</p>
+                            <p className="text-xs text-muted-foreground uppercase">Projeção</p>
                           </div>
                           <div className="text-center">
                             <div className="text-xl font-bold text-foreground">
@@ -456,16 +446,17 @@ const TeamBuilder = () => {
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto space-y-1">
             {swapOptions.map((o) => {
-              const delta = Number(o.media ?? 0) - Number(swapping?.media ?? 0);
+              const delta = (values.get(o.id) ?? 0) - (values.get(swapping?.id ?? -1) ?? 0);
               const alreadyInLineup = myLineup.some((m) => m.id === o.id);
+              const unaffordable = sumPreco(myLineup) - Number(swapping?.preco ?? 0) + Number(o.preco ?? 0) > budget + 0.001;
               return (
                 <button
                   key={o.id}
-                  disabled={alreadyInLineup}
+                  disabled={alreadyInLineup || unaffordable || o.status_id !== 7}
                   onClick={() => handleSwap(o)}
                   className={cn(
                     "w-full text-left bg-secondary/30 border border-border rounded p-3 transition-all",
-                    alreadyInLineup ? "opacity-40 cursor-not-allowed" : "hover:border-primary hover:bg-primary/5"
+                    alreadyInLineup || unaffordable || o.status_id !== 7 ? "opacity-40 cursor-not-allowed" : "hover:border-primary hover:bg-primary/5"
                   )}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -473,11 +464,11 @@ const TeamBuilder = () => {
                       <p className="font-bold text-foreground truncate">{o.apelido}</p>
                       <p className="text-xs text-muted-foreground">
                         {clubes[o.clube_id ?? 0]?.abreviacao ?? "-"} · {o.jogos ?? 0} jogos · C$ {Number(o.preco ?? 0).toFixed(2)}
-                        {alreadyInLineup && " · já escalado"}
+                        {alreadyInLineup && " · já escalado"}{unaffordable && " · acima do patrimônio"}{o.status_id !== 7 && " · não provável"}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-black text-neon-green">{Number(o.media ?? 0).toFixed(1)}</p>
+                      <p className="text-lg font-black text-neon-green">{(values.get(o.id) ?? 0).toFixed(1)}</p>
                       <p className={cn("text-xs font-bold", delta >= 0 ? "text-neon-green" : "text-destructive")}>
                         {delta >= 0 ? "+" : ""}{delta.toFixed(2)}
                       </p>
