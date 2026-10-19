@@ -40,7 +40,7 @@ export default function JogosDaRodada(){
          <div className="font-black text-lg tabular-nums">
            {j.placarCasa!==null&&j.placarFora!==null?j.placarCasa+" × "+j.placarFora:"×"}
          </div>
-         <div className="text-[10px] text-muted-foreground">{j.periodo?j.periodo.replaceAll("_"," "):new Date(j.partidaEm).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>
+         <div className="text-[10px] text-muted-foreground">{j.periodo?j.periodo.replace(/_/g," "):new Date(j.partidaEm).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</div>
        </div>
        {renderClub(j.fora,j.posicaoFora)}
       </div>

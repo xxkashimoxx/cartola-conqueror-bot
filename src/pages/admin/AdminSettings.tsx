@@ -33,8 +33,8 @@ const AdminSettings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-3">
                 <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-medium text-foreground">{user?.email}</p>
+                  <p className="text-sm text-muted-foreground">Conta</p>
+                  <p className="font-medium text-foreground">{user ? "Administrador" : "Não autenticado"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Role</p>
