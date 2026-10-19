@@ -143,6 +143,10 @@ const TeamBuilder = () => {
   };
 
   const handleSave = async () => {
+    if (loading || !analysisReady) {
+      toast({ title: "Análise em andamento", description: "Aguarde o carregamento das pontuações e confrontos.", variant: "destructive" });
+      return;
+    }
     if (!user) {
       toast({ title: "Faça login", description: "Precisa estar logado pra salvar.", variant: "destructive" });
       return;
@@ -227,7 +231,7 @@ const TeamBuilder = () => {
             <Button onClick={handleReset} variant="outline" className="border-border">
               <ArrowRightLeft className="mr-2 h-4 w-4" /> Resetar
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/80 font-bold shadow-neon">
+            <Button onClick={handleSave} disabled={saving || loading || !analysisReady} className="bg-primary hover:bg-primary/80 font-bold shadow-neon">
               {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Salvar
             </Button>
