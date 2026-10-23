@@ -1,4 +1,4 @@
-import {hasOwnerSession} from "../server/owner.js";
+import {hasOwnerSession,publicAppAccess} from "../server/owner.js";
 // Server-only Cartola API. Requires DATABASE_URL on Vercel (never VITE_DATABASE_URL).
 import { neon } from "@neondatabase/serverless";
 
@@ -205,7 +205,8 @@ export default async function handler(req:any,res:any) {
   if(req.method==="OPTIONS") return res.status(204).end();
   const name=String(req.query?.name||"");
   const authorizedCron = (name==="sync-cartola-data" || name==="sync-parciais") && !!process.env.CRON_SECRET && req.headers.authorization==="Bearer "+process.env.CRON_SECRET;
-  if(!authorizedCron && !hasOwnerSession(req)) return json(res,401,{success:false,error:"Faça login para continuar."});
+  const publicRead=publicAppAccess() && (name==="status-temporada" || name==="get-top-players");
+  if(!authorizedCron && !hasOwnerSession(req) && !publicRead) return json(res,401,{success:false,error:"Faça login para continuar."});
   if(req.method!=="GET"&&req.method!=="POST") return json(res,405,{error:"Método inválido"});
   try {
     if(name==="status-temporada") {

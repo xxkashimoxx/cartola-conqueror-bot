@@ -167,7 +167,8 @@ const TeamBuilder = () => {
 
   // The saved roster is the owner's source of truth; changing modes never modifies it.
   useEffect(()=>{
-    if(!user||!rodada||!atletas.length)return;
+    if(!user){setSavedLoaded(true);return;}
+    if(!rodada||!atletas.length)return;
     let active=true;
     setSavedLoaded(false);
     (async()=>{
@@ -286,7 +287,7 @@ const TeamBuilder = () => {
 
   const handleSave = async () => {
     if (!user) {
-      toast({ title: "Faça login", description: "Precisa estar logado pra salvar.", variant: "destructive" });
+      toast({ title: "Acesso temporário", description: "Entre como administrador em /auth para salvar a escalação.", variant: "destructive" });
       return;
     }
     if (!rodada) {
@@ -384,6 +385,7 @@ const TeamBuilder = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {!user && <p className="mb-5 text-sm text-muted-foreground">Acesso temporário: você pode montar e simular um time, mas para salvar e consultar o histórico é preciso <a className="text-primary underline" href="/auth">entrar como administrador</a>.</p>}
         <Card className="border-primary/50 p-4 mb-5 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>

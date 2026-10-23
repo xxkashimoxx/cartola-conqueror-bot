@@ -1,4 +1,4 @@
-import {ownerOnly} from "../server/owner.js";
+import {hasOwnerSession,ownerOnly,publicAppAccess,safeOrigin} from "../server/owner.js";
 import { neon } from "@neondatabase/serverless";
 
 // Backend de leitura analítica. Todos os dados vêm do Neon / Cartola 2026.
@@ -171,8 +171,10 @@ async function noticias(body:any){
 }
 export default async function handler(req:any,res:any){
   if(!["GET","POST"].includes(req.method))return reply(res,405,{error:"Método inválido"});
-  if(!ownerOnly(req,res))return;
   const name=String(req.query?.name||"");
+  const publicNames=new Set(["confrontos","ausencias","oportunidades","mercado-inteligente","simulador","resumo-rodada","news-brasileirao"]);
+  if(!hasOwnerSession(req)&&!(publicAppAccess()&&publicNames.has(name))){ownerOnly(req,res);return;}
+  if(req.method==="POST"&&!safeOrigin(req))return reply(res,403,{error:"Origem não autorizada"});
   try{
     const b=req.body||{};
     let data:any;

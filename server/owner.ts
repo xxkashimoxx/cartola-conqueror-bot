@@ -33,6 +33,8 @@ export function hasOwnerSession(req:any):boolean{
   return value.sub===OWNER_ID&&Number.isSafeInteger(value.iat)&&Number.isSafeInteger(value.exp)&&value.iat<=now+60&&value.exp>now&&value.exp<=value.iat+WEEK+10;
  }catch{return false;}
 }
+// Temporary, server-controlled guest access. Never grants an owner session.
+export const publicAppAccess=()=>process.env.PUBLIC_APP_ACCESS==="true";
 export function setOwnerCookie(res:any,token:string,maxAge=WEEK){
  res.setHeader("Set-Cookie",COOKIE+"="+token+"; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age="+maxAge);
 }

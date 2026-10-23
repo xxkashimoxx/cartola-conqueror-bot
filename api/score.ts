@@ -1,9 +1,9 @@
 import {neon} from "@neondatabase/serverless";
-import {ownerOnly,safeOrigin,OWNER_ID} from "../server/owner.js";
+import {hasOwnerSession,ownerOnly,publicAppAccess,safeOrigin,OWNER_ID} from "../server/owner.js";
 import {scoringContext,scoreTeam} from "../server/scoring.js";
 const db=neon(process.env.DATABASE_URL||"");
 export default async function handler(req:any,res:any){
- if(!ownerOnly(req,res))return;
+ if(!hasOwnerSession(req)&&!(publicAppAccess()&&req.method==="POST")){ownerOnly(req,res);return;}
  if(req.method!=="GET"&&req.method!=="POST")return res.status(405).json({error:"Método inválido"});
  if(req.method==="POST"&&!safeOrigin(req))return res.status(403).json({error:"Origem inválida"});
  const rodada=Number(req.method==="POST"?req.body?.rodada:req.query?.rodada);

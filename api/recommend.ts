@@ -1,5 +1,5 @@
 import {neon} from "@neondatabase/serverless";
-import {ownerOnly} from "../server/owner.js";
+import {hasOwnerSession,ownerOnly,publicAppAccess} from "../server/owner.js";
 import {optimize, type Candidate} from "../server/recommendation.js";
 type Mode="balanceada"|"ofensiva"|"defensiva";
 const num=(v:any)=>Number(v)||0;
@@ -55,7 +55,7 @@ function compute(raw:any,points:number[],context:{opponent:string;home:boolean;o
   confidence:games>=10&&sample>=5?"alta":games>=5&&sample>=3?"moderada":"baixa"};
 }
 export default async function handler(req:any,res:any){
- if(!ownerOnly(req,res))return;
+ if(!hasOwnerSession(req)&&!publicAppAccess()){ownerOnly(req,res);return;}
  if(req.method!=="GET")return res.status(405).json({success:false,error:"GET obrigatório"});
  const m=String(req.query?.mode||"balanceada");
  if(!["balanceada","ofensiva","defensiva"].includes(m))return res.status(400).json({error:"Modo inválido"});

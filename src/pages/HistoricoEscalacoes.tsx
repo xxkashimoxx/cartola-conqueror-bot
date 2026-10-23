@@ -61,7 +61,7 @@ const HistoricoEscalacoes = () => {
   const [atletasMap, setAtletasMap] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    if(!user)return;
+    if(!user){setLoading(false);return;}
     let active=true;
     const reload=async()=>{
       try{
@@ -200,12 +200,12 @@ const HistoricoEscalacoes = () => {
         ) : resumos.length === 0 ? (
           <Card className="p-10 text-center bg-card border-border">
             <Trophy className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-            <p className="text-lg font-bold text-foreground mb-1">Nenhuma escalação salva ainda</p>
+            <p className="text-lg font-bold text-foreground mb-1">{user ? "Nenhuma escalação salva ainda" : "Histórico privado"}</p>
             <p className="text-sm text-muted-foreground mb-4">
-              Vai no Construtor de Time, monta e salva pra começar teu histórico.
+              {user ? "Vai no Construtor de Time, monta e salva pra começar teu histórico." : "Entre como administrador para consultar suas escalações salvas."}
             </p>
-            <Button onClick={() => navigate("/team-builder")} className="bg-primary hover:bg-primary/80">
-              Montar primeira escalação
+            <Button onClick={() => navigate(user ? "/team-builder" : "/auth")} className="bg-primary hover:bg-primary/80">
+              {user ? "Montar primeira escalação" : "Entrar como administrador"}
             </Button>
           </Card>
         ) : (

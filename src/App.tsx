@@ -5,7 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 
@@ -55,6 +55,12 @@ const RouteLoadingFallback = () => (
   </main>
 );
 
+const HomeRedirect = () => {
+  const { loading, publicAccess } = useAuth();
+  if (loading) return <RouteLoadingFallback />;
+  return <Navigate to={publicAccess ? "/dashboard" : "/auth"} replace />;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
@@ -65,7 +71,7 @@ const App = () => (
           <AppErrorBoundary>
             <Suspense fallback={<RouteLoadingFallback />}>
               <Routes>
-                <Route path="/" element={<Navigate to="/auth" replace />} />
+                <Route path="/" element={<HomeRedirect />} />
                 <Route path="/auth" element={<Auth />} />
                 <Route
                   path="/dashboard"

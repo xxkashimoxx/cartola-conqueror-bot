@@ -1,5 +1,11 @@
 # Welcome to your Lovable project
 
+## Acesso público temporário
+
+Defina `PUBLIC_APP_ACCESS=true` no ambiente da Vercel e faça um novo deploy para abrir `/` diretamente no painel sem senha. O servidor libera apenas leitura dos dados esportivos e simulações; salvar escalações, acessar histórico privado, sincronizar e usar `/admin` ainda requerem login em `/auth`.
+
+Para voltar a exigir senha no app inteiro, remova `PUBLIC_APP_ACCESS` (ou defina `false`) e faça um novo deploy. O padrão sem a variável é acesso privado.
+
 ## Project info
 
 **URL**: https://lovable.dev/projects/2d60a4e0-4eb9-4cf5-b773-ae55ff6245c4

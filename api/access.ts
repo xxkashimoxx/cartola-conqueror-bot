@@ -1,8 +1,8 @@
 import {neon} from "@neondatabase/serverless";
-import {OWNER_ID,verifyPassword,issueSession,hasOwnerSession,setOwnerCookie,clearOwnerCookie,safeOrigin,loginHash} from "../server/owner.js";
+import {OWNER_ID,verifyPassword,issueSession,hasOwnerSession,publicAppAccess,setOwnerCookie,clearOwnerCookie,safeOrigin,loginHash} from "../server/owner.js";
 function reply(res:any,code:number,json:any){res.setHeader("Cache-Control","no-store, private");return res.status(code).json(json);}
 export default async function handler(req:any,res:any){
- if(req.method==="GET")return reply(res,200,{authenticated:hasOwnerSession(req),user:hasOwnerSession(req)?{id:OWNER_ID,role:"admin"}:null});
+ if(req.method==="GET")return reply(res,200,{authenticated:hasOwnerSession(req),publicAccess:publicAppAccess(),user:hasOwnerSession(req)?{id:OWNER_ID,role:"admin"}:null});
  if(req.method!=="POST"&&req.method!=="DELETE")return reply(res,405,{error:"Método não permitido"});
  if(!safeOrigin(req))return reply(res,403,{error:"Origem da requisição inválida"});
  if(req.method==="DELETE"){clearOwnerCookie(res);return reply(res,200,{success:true});}

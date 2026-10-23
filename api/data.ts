@@ -1,8 +1,9 @@
 import {neon} from "@neondatabase/serverless";
-import {ownerOnly,safeOrigin} from "../server/owner.js";
+import {hasOwnerSession,ownerOnly,publicAppAccess,safeOrigin} from "../server/owner.js";
 const TABLES=new Set(["atletas","clubes","posicoes","mercado_status","atleta_parciais","atleta_pontuacoes",
  "partidas","ausencias","oportunidades","news_cache","predictions_cache","profiles","user_roles","sync_analytics"]);
 const WRITE_TABLES=new Set(["sync_analytics"]);
+const PUBLIC_TABLES=new Set(["atletas","clubes","posicoes","mercado_status","atleta_parciais","atleta_pontuacoes","partidas","ausencias","oportunidades"]);
 const ident=(name:any)=>typeof name==="string"&&/^[a-z][a-z0-9_]*$/.test(name)&&name.length<=70;
 const sql=neon(process.env.DATABASE_URL||"");
 const NUMERIC_COLUMNS=new Set(["preco","media","jogos","pontos_num","variacao_preco","pontos","score","valor_total","pontos_esperados","probabilidade","xg_casa","xg_fora","clean_sheet_casa","clean_sheet_fora","peso","rodada_atual","status_mercado"]);
@@ -12,12 +13,12 @@ function normalized(row:any){
 }
 
 export default async function handler(req:any,res:any){
- if(!ownerOnly(req,res))return;
  if(req.method!=="POST")return res.status(405).json({data:null,error:{message:"Método inválido"}});
  if(!safeOrigin(req))return res.status(403).json({data:null,error:{message:"Origem não autorizada"}});
  res.setHeader("Cache-Control","no-store,private");
  const body=req.body||{},table=body.table,action=body.action||"select";
  if(!TABLES.has(table))return res.status(400).json({data:null,error:{message:"Tabela não permitida"}});
+ if(!hasOwnerSession(req)&&!(publicAppAccess()&&action==="select"&&PUBLIC_TABLES.has(table))){ownerOnly(req,res);return;}
  try {
   if(action==="insert"){
    if(!WRITE_TABLES.has(table))return res.status(403).json({data:null,error:{message:"Escrita bloqueada nesta coleção"}});
